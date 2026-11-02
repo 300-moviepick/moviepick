@@ -27,8 +27,10 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -79,7 +81,7 @@ public class ReviewService implements MovieReviewReader {
             case VISIBLE -> throw new BusinessException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
             case BLIND -> throw new BusinessException(ReviewErrorCode.REVIEW_BLINDED);
             default -> {
-                // [수정] 이전 좋아요 기록을 지운 뒤 덮어쓴다 (likeCount 0 초기화와 기록을 일치시킴)
+                // [수정] 이전 좋아요 기록을 지운 뒤 덮어쓴다 (다시 쓴 리뷰는 좋아요 0부터 시작)
                 reviewLikeRepository.deleteAllByReviewId(existing.getId());
                 existing.rewrite(rating, content, spoiler);   // DELETED → VISIBLE
             }
@@ -102,25 +104,35 @@ public class ReviewService implements MovieReviewReader {
             Long movieId, Long memberId, ReviewSort sort, int page, int size) {
         movieRatingService.getMovie(movieId);   // 없으면 MOVIE_NOT_FOUND
 
-        Page<Review> reviews = reviewRepository.findByMovieIdAndStatusIn(
-                movieId, LISTED_STATUSES, PageRequest.of(page, size, sort.getSort()));
+        Page<Review> reviews = sort == ReviewSort.LIKES
+                ? reviewRepository.findByMovieIdOrderByLikes(movieId, LISTED_STATUSES, PageRequest.of(page, size))
+                : reviewRepository.findByMovieIdAndStatusIn(
+                        movieId, LISTED_STATUSES, PageRequest.of(page, size, sort.getSort()));
+        Map<Long, Integer> likeCounts = countLikes(reviews.getContent());
         Set<Long> likedIds = findLikedReviewIds(memberId, reviews.getContent());
 
-        return PageResponse.from(reviews.map(r -> ReviewResponse.of(r, likedIds.contains(r.getId()))));
+        return PageResponse.from(reviews.map(r -> ReviewResponse.of(
+                r, likeCounts.getOrDefault(r.getId(), 0), likedIds.contains(r.getId()))));
     }
 
     public PageResponse<ReviewWithMovieResponse> getReviews(ReviewSort sort, int page, int size) {
         // 비활성 영화의 리뷰는 전체 목록에서 뺀다 (내 리뷰에는 남김)
-        Page<Review> reviews = reviewRepository.findByStatusInAndMovieActiveTrue(
-                LISTED_STATUSES, PageRequest.of(page, size, sort.getSort()));
-        return PageResponse.from(reviews.map(ReviewWithMovieResponse::withAuthor));
+        Page<Review> reviews = sort == ReviewSort.LIKES
+                ? reviewRepository.findAllOrderByLikes(LISTED_STATUSES, PageRequest.of(page, size))
+                : reviewRepository.findByStatusInAndMovieActiveTrue(
+                        LISTED_STATUSES, PageRequest.of(page, size, sort.getSort()));
+        Map<Long, Integer> likeCounts = countLikes(reviews.getContent());
+        return PageResponse.from(reviews.map(r ->
+                ReviewWithMovieResponse.withAuthor(r, likeCounts.getOrDefault(r.getId(), 0))));
     }
 
     public PageResponse<ReviewWithMovieResponse> getMyReviews(Long memberId, int page, int size) {
         Page<Review> reviews = reviewRepository.findByMemberIdAndStatusIn(
                 memberId, LISTED_STATUSES,
                 PageRequest.of(page, size, ReviewSort.LATEST.getSort()));
-        return PageResponse.from(reviews.map(ReviewWithMovieResponse::forMine));
+        Map<Long, Integer> likeCounts = countLikes(reviews.getContent());
+        return PageResponse.from(reviews.map(r ->
+                ReviewWithMovieResponse.forMine(r, likeCounts.getOrDefault(r.getId(), 0))));
     }
 
     /**
@@ -209,6 +221,18 @@ public class ReviewService implements MovieReviewReader {
     private BigDecimal normalizeRating(BigDecimal rating) {
         Review.validateRating(rating);
         return rating.setScale(1, RoundingMode.UNNECESSARY);
+    }
+
+    /** 한 페이지 리뷰의 좋아요 수 (reviewId → 수). 좋아요가 없는 리뷰는 맵에 없으므로 getOrDefault(id, 0)로 꺼낸다 */
+    private Map<Long, Integer> countLikes(List<Review> reviews) {
+        if (reviews.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = reviews.stream().map(Review::getId).toList();
+        return reviewLikeRepository.countByReviewIds(ids).stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> Math.toIntExact((Long) row[1])));
     }
 
     private Set<Long> findLikedReviewIds(Long memberId, List<Review> reviews) {

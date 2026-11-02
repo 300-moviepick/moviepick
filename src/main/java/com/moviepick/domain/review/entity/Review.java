@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
-@DynamicUpdate   // 수정 시 바뀐 컬럼만 UPDATE (likeCount를 오래된 값으로 덮어쓰는 것 방지).
+@DynamicUpdate   // 수정 시 바뀐 컬럼만 UPDATE
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
@@ -24,7 +24,9 @@ import org.hibernate.annotations.DynamicUpdate;
                 columnNames = {"member_id", "movie_id"}),
         indexes = {
                 @Index(name = "idx_reviews_movie_id_status_created_at", columnList = "movie_id, status, created_at"),
-                @Index(name = "idx_reviews_member_id_status", columnList = "member_id, status")
+                @Index(name = "idx_reviews_member_id_status", columnList = "member_id, status"),
+                // 전체 리뷰 목록 최신순
+                @Index(name = "idx_reviews_status_created_at", columnList = "status, created_at")
         })
 public class Review extends BaseEntity {
 
@@ -57,10 +59,6 @@ public class Review extends BaseEntity {
     @Column(nullable = false, length = 10)
     private ReviewStatus status;
 
-    // 좋아요 수 (카운터). 증감은 Repository의 원자적 UPDATE 쿼리로만 처리한다.
-    @Column(nullable = false)
-    private int likeCount;
-
     // 삭제한 리뷰를 다시 쓴 시각. 처음 쓴 리뷰는 null ("다시 작성됨" 표시, A7)
     @Column(name = "rewritten_at")
     private LocalDateTime rewrittenAt;
@@ -74,7 +72,6 @@ public class Review extends BaseEntity {
         review.content = content;
         review.spoiler = spoiler;
         review.status = ReviewStatus.VISIBLE;
-        review.likeCount = 0;
         return review;
     }
 
@@ -88,7 +85,6 @@ public class Review extends BaseEntity {
         this.content = content;
         this.spoiler = spoiler;
         this.status = ReviewStatus.VISIBLE;
-        this.likeCount = 0;
         this.rewrittenAt = LocalDateTime.now();
     }
 
