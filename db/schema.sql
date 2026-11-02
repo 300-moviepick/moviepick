@@ -35,6 +35,7 @@ CREATE TABLE `comment` (
   PRIMARY KEY (`id`),
   KEY `FKocwtsgphsvfiqmipwu0qqj84l` (`member_id`),
   KEY `FKs1slvnkuemjsq2kj4h3vhx7i1` (`post_id`),
+  KEY `idx_comment_post_id_status_created_at` (`post_id`,`status`,`created_at`),
   CONSTRAINT `FKocwtsgphsvfiqmipwu0qqj84l` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`),
   CONSTRAINT `FKs1slvnkuemjsq2kj4h3vhx7i1` FOREIGN KEY (`post_id`) REFERENCES `post` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -156,6 +157,7 @@ CREATE TABLE `post` (
   `status` enum('BLINDED','DELETED','VISIBLE') NOT NULL,
   PRIMARY KEY (`id`),
   KEY `FK6okhu5mmwauixu447h0fnipql` (`member_id`),
+  KEY `idx_post_status_created_at` (`status`,`created_at`),
   CONSTRAINT `FK6okhu5mmwauixu447h0fnipql` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -186,7 +188,6 @@ CREATE TABLE `review_likes` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `reviews` (
-  `like_count` int NOT NULL,
   `rating` decimal(2,1) NOT NULL,
   `spoiler` bit(1) NOT NULL,
   `created_at` datetime(6) NOT NULL,
@@ -201,6 +202,7 @@ CREATE TABLE `reviews` (
   UNIQUE KEY `uk_reviews_member_id_movie_id` (`member_id`,`movie_id`),
   KEY `idx_reviews_movie_id_status_created_at` (`movie_id`,`status`,`created_at`),
   KEY `idx_reviews_member_id_status` (`member_id`,`status`),
+  KEY `idx_reviews_status_created_at` (`status`,`created_at`),
   CONSTRAINT `FK6wsc8rr8tb1fc782foh3mjc8q` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`),
   CONSTRAINT `FK87tlqya0rq8ijfjscldpvvdyq` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
