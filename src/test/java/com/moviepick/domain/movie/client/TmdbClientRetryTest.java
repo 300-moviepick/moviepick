@@ -1,6 +1,6 @@
-
 package com.moviepick.domain.movie.client;
 
+import com.moviepick.domain.movie.client.dto.TmdbMovieResponse;
 import com.moviepick.domain.movie.client.dto.TmdbPopularResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,10 +8,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.web.client.RequestMatcher;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -30,15 +33,71 @@ class TmdbClientRetryTest {
     private static final String POPULAR_URL =
             BASE_URL + "/movie/popular?language=ko-KR&page=1";
 
-    private static final String DETAIL_URL =
-            BASE_URL + "/movie/123?language=ko-KR";
-
     private static final String POPULAR_RESPONSE = """
             {
               "page": 1,
               "results": [],
               "total_pages": 1,
               "total_results": 0
+            }
+            """;
+
+    private static final String DETAIL_RESPONSE = """
+            {
+              "id": 550,
+              "title": "테스트 영화",
+              "genres": [
+                {
+                  "id": 18,
+                  "name": "드라마"
+                }
+              ],
+              "videos": {
+                "results": [
+                  {
+                    "id": "video1",
+                    "name": "Trailer",
+                    "key": "abc123",
+                    "site": "YouTube",
+                    "type": "Trailer",
+                    "official": true,
+                    "iso_639_1": "en"
+                  }
+                ]
+              },
+              "credits": {
+                "cast": [
+                  {
+                    "id": 101,
+                    "name": "테스트 배우",
+                    "character": "주인공",
+                    "order": 0,
+                    "profile_path": "/actor.jpg"
+                  }
+                ],
+                "crew": [
+                  {
+                    "id": 201,
+                    "name": "테스트 감독",
+                    "job": "Director",
+                    "department": "Directing"
+                  }
+                ]
+              },
+              "watch/providers": {
+                "results": {
+                  "KR": {
+                    "link": "https://www.themoviedb.org/movie/550/watch",
+                    "flatrate": [
+                      {
+                        "provider_id": 8,
+                        "provider_name": "테스트 OTT",
+                        "logo_path": "/ott.png"
+                      }
+                    ]
+                  }
+                }
+              }
             }
             """;
 
@@ -133,7 +192,7 @@ class TmdbClientRetryTest {
 
     @Test
     void doNotRetry404() {
-        server.expect(requestTo(DETAIL_URL))
+        server.expect(detailRequest(123L))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         RestClientResponseException exception = assertThrows(
@@ -253,5 +312,79 @@ class TmdbClientRetryTest {
         assertEquals(429, exception.getStatusCode().value());
         assertTrue(retryDelays.isEmpty());
         server.verify();
+    }
+
+    @Test
+    void deserializeAppendedMovieDetails() {
+        server.expect(detailRequest(550L))
+                .andRespond(withSuccess(
+                        DETAIL_RESPONSE,
+                        MediaType.APPLICATION_JSON
+                ));
+
+        TmdbMovieResponse response =
+                tmdbClient.getMovieDetail(550L);
+
+        assertEquals(550L, response.id());
+        assertEquals("테스트 영화", response.title());
+
+        // 예고편
+        assertNotNull(response.videos());
+        assertEquals(
+                "abc123",
+                response.videos().results().get(0).key()
+        );
+        assertEquals(
+                "YouTube",
+                response.videos().results().get(0).site()
+        );
+
+        // 출연진 및 감독
+        assertNotNull(response.credits());
+        assertEquals(
+                "테스트 배우",
+                response.credits().cast().get(0).name()
+        );
+        assertEquals(
+                "Director",
+                response.credits().crew().get(0).job()
+        );
+
+        // 한국 OTT
+        assertNotNull(response.watchProviders());
+
+        var koreanProviders =
+                response.watchProviders().results().get("KR");
+
+        assertNotNull(koreanProviders);
+        assertEquals(
+                "테스트 OTT",
+                koreanProviders.flatrate().get(0).providerName()
+        );
+
+        assertTrue(retryDelays.isEmpty());
+        server.verify();
+    }
+
+    private RequestMatcher detailRequest(long tmdbId) {
+        return request -> {
+            var uri = request.getURI();
+
+            assertEquals(
+                    "/3/movie/" + tmdbId,
+                    uri.getPath()
+            );
+
+            String query = URLDecoder.decode(
+                    uri.getRawQuery(),
+                    StandardCharsets.UTF_8
+            );
+
+            assertTrue(query.contains("language=ko-KR"));
+
+            assertTrue(query.contains(
+                    "append_to_response=videos,credits,watch/providers"
+            ));
+        };
     }
 }

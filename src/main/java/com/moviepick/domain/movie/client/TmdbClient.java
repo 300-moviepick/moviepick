@@ -29,6 +29,9 @@ public class TmdbClient {
     private static final long RETRY_DELAY_MILLIS = 1000L;
     private static final long MAX_RETRY_AFTER_MILLIS = 30_000L;
 
+    private static final String APPEND_TO_RESPONSE =
+            "videos,credits,watch/providers";
+
     private final RestClient restClient;
     private final RetrySleeper retrySleeper;
 
@@ -68,6 +71,7 @@ public class TmdbClient {
         this.retrySleeper = retrySleeper;
     }
 
+    // TMDB 인기 영화 목록 조회
     public TmdbPopularResponse getPopularMovies(int page) {
         if (page < 1) {
             throw new IllegalArgumentException(
@@ -95,6 +99,7 @@ public class TmdbClient {
         return response;
     }
 
+    // 영화 상세 및 확장 데이터 조회
     public TmdbMovieResponse getMovieDetail(Long tmdbId) {
         if (tmdbId == null || tmdbId <= 0) {
             throw new IllegalArgumentException(
@@ -107,6 +112,10 @@ public class TmdbClient {
                         .uri(uriBuilder -> uriBuilder
                                 .path("/movie/{movieId}")
                                 .queryParam("language", "ko-KR")
+                                .queryParam(
+                                        "append_to_response",
+                                        APPEND_TO_RESPONSE
+                                )
                                 .build(tmdbId))
                         .retrieve()
                         .body(TmdbMovieResponse.class)
@@ -136,7 +145,6 @@ public class TmdbClient {
 
                 long delay = resolveRetryDelay(e, attempt);
 
-                // 서버가 요구한 대기 시간이 너무 길면 재시도 중단
                 if (delay < 0) {
                     log.warn(
                             "TMDB API 재시도 중단: Retry-After가 30초를 초과합니다."
@@ -192,7 +200,6 @@ public class TmdbClient {
 
         retryAfter = retryAfter.trim();
 
-        // 초 단위 Retry-After 처리
         if (retryAfter.matches("[0-9]+")) {
             try {
                 long seconds = Long.parseLong(retryAfter);
@@ -207,7 +214,6 @@ public class TmdbClient {
             }
         }
 
-        // HTTP 날짜 형식 Retry-After 처리
         try {
             Instant retryTime = ZonedDateTime.parse(
                     retryAfter,
