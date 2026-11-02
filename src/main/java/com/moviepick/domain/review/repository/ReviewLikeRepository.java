@@ -22,4 +22,12 @@ public interface ReviewLikeRepository extends JpaRepository<ReviewLike, Long> {
     @Query("select rl.review.id from ReviewLike rl where rl.member.id = :memberId and rl.review.id in :reviewIds")
     List<Long> findLikedReviewIds(@Param("memberId") Long memberId,
                                   @Param("reviewIds") Collection<Long> reviewIds);
+
+    // ===== 좋아요 수 (like_count 컬럼 대신 review_likes 집계. idx_review_likes_review_id 사용) =====
+
+    long countByReviewId(Long reviewId);
+
+    // 목록용: 한 페이지의 리뷰 좋아요 수를 쿼리 한 번으로. 좋아요가 없는 리뷰는 결과에 없다
+    @Query("select rl.review.id, count(rl) from ReviewLike rl where rl.review.id in :reviewIds group by rl.review.id")
+    List<Object[]> countByReviewIds(@Param("reviewIds") Collection<Long> reviewIds);
 }
