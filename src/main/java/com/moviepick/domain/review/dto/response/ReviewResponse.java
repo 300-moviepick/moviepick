@@ -19,7 +19,7 @@ public record ReviewResponse(
         // 삭제 후 다시 쓴 리뷰면 true ("다시 작성됨" 표시)
         boolean rewritten
 ) {
-    public static ReviewResponse of(Review review, boolean likedByMe) {
+    public static ReviewResponse of(Review review, int likeCount, boolean likedByMe) {
         boolean blinded = review.getStatus() == ReviewStatus.BLIND;
 
         return new ReviewResponse(
@@ -28,7 +28,7 @@ public record ReviewResponse(
                 blinded ? null : review.getRating(),
                 blinded ? null : review.getContent(),
                 review.isSpoiler(),
-                review.getLikeCount(),
+                likeCount,
                 likedByMe,
                 review.getCreatedAt(),
                 blinded,

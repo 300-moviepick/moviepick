@@ -49,16 +49,25 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @EntityGraph(attributePaths = "movie")
     Page<Review> findByMemberIdAndStatusIn(Long memberId, Collection<ReviewStatus> statuses, Pageable pageable);
 
+    // ===== 좋아요순 (review_likes 집계로 정렬. Pageable에는 정렬을 넣지 않는다) =====
+
+    @EntityGraph(attributePaths = "member")
+    @Query(value = "select r from Review r "
+            + "where r.movie.id = :movieId and r.status in :statuses "
+            + "order by (select count(rl) from ReviewLike rl where rl.review = r) desc, r.createdAt desc, r.id desc",
+            countQuery = "select count(r) from Review r where r.movie.id = :movieId and r.status in :statuses")
+    Page<Review> findByMovieIdOrderByLikes(@Param("movieId") Long movieId,
+                                           @Param("statuses") Collection<ReviewStatus> statuses,
+                                           Pageable pageable);
+
+    @EntityGraph(attributePaths = {"member", "movie"})
+    @Query(value = "select r from Review r "
+            + "where r.status in :statuses and r.movie.active = true "
+            + "order by (select count(rl) from ReviewLike rl where rl.review = r) desc, r.createdAt desc, r.id desc",
+            countQuery = "select count(r) from Review r where r.status in :statuses and r.movie.active = true")
+    Page<Review> findAllOrderByLikes(@Param("statuses") Collection<ReviewStatus> statuses, Pageable pageable);
+
     boolean existsByIdAndStatus(Long id, ReviewStatus status);
-
-    // ===== 좋아요 수 (원자적 증감) =====
-
-    @Modifying(flushAutomatically = true)
-    @Query("update Review r set r.likeCount = r.likeCount - 1 where r.id = :id and r.likeCount > 0")
-    int decreaseLikeCount(@Param("id") Long id);
-
-    @Query("select r.likeCount from Review r where r.id = :id")
-    int findLikeCountById(@Param("id") Long id);
 
     // [수정] 추가: 영화 상세의 myReviewId 조회용 (VISIBLE 리뷰만)
     @Query("select r.id from Review r "
@@ -74,10 +83,4 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                      @Param("from") ReviewStatus from,
                      @Param("to") ReviewStatus to,
                      @Param("now") LocalDateTime now);
-
-    // 공개 상태일 때만 +1. 바뀐 줄이 0이면 삭제·숨김된 리뷰
-    @Modifying(flushAutomatically = true)
-    @Query("update Review r set r.likeCount = r.likeCount + 1 "
-            + "where r.id = :id and r.status = :status")
-    int increaseLikeCountIfStatus(@Param("id") Long id, @Param("status") ReviewStatus status);
 }

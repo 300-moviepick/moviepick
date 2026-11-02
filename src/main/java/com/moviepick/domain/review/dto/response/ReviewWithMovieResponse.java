@@ -25,15 +25,16 @@ public record ReviewWithMovieResponse(
         // 삭제 후 다시 쓴 리뷰면 true ("다시 작성됨" 표시)
         boolean rewritten
 ) {
-    public static ReviewWithMovieResponse withAuthor(Review review) {
-        return of(review, AuthorResponse.from(review.getMember()), null);
+    public static ReviewWithMovieResponse withAuthor(Review review, int likeCount) {
+        return of(review, likeCount, AuthorResponse.from(review.getMember()), null);
     }
 
-    public static ReviewWithMovieResponse forMine(Review review) {
-        return of(review, null, review.getMovie().isActive());
+    public static ReviewWithMovieResponse forMine(Review review, int likeCount) {
+        return of(review, likeCount, null, review.getMovie().isActive());
     }
 
-    private static ReviewWithMovieResponse of(Review review, AuthorResponse author, Boolean movieActive) {
+    private static ReviewWithMovieResponse of(Review review, int likeCount,
+                                              AuthorResponse author, Boolean movieActive) {
         boolean blinded = review.getStatus() == ReviewStatus.BLIND;
 
         return new ReviewWithMovieResponse(
@@ -43,7 +44,7 @@ public record ReviewWithMovieResponse(
                 blinded ? null : review.getRating(),
                 blinded ? null : review.getContent(),
                 review.isSpoiler(),
-                review.getLikeCount(),
+                likeCount,
                 review.getCreatedAt(),
                 movieActive,
                 blinded,
