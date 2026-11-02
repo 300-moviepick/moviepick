@@ -3,7 +3,8 @@
 -- 이 파일은 Docker MySQL 컨테이너가 처음 만들어질 때 db/init/00-init.sh가 실행한다.
 -- 바뀐 구조를 반영하려면: docker compose down -v → docker compose up -d
 -- 제약 이름 uk_members_email_provider, uk_post_like_member, uk_comment_like_member,
--- uk_review_likes_member_id_review_id, uk_report_reporter_target, uk_members_nickname 는 코드가 중복 오류를 판별할 때 쓰므로 이름을 바꾸지 않는다.
+-- uk_review_likes_member_id_review_id, uk_report_reporter_target, uk_members_nickname,
+-- uk_wishlists_member_id_movie_id 는 코드가 중복 오류를 판별할 때 쓰므로 이름을 바꾸지 않는다.
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -202,6 +203,38 @@ CREATE TABLE `reviews` (
   KEY `idx_reviews_member_id_status` (`member_id`,`status`),
   CONSTRAINT `FK6wsc8rr8tb1fc782foh3mjc8q` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`),
   CONSTRAINT `FK87tlqya0rq8ijfjscldpvvdyq` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `wishlists` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `member_id` bigint NOT NULL,
+  `movie_id` bigint NOT NULL,
+  `created_at` datetime(6) NOT NULL,
+  `updated_at` datetime(6) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_wishlists_member_id_movie_id` (`member_id`,`movie_id`),
+  KEY `idx_wishlists_movie_id` (`movie_id`),
+  CONSTRAINT `fk_wishlists_member_id` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`),
+  CONSTRAINT `fk_wishlists_movie_id` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `notifications` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `member_id` bigint NOT NULL,
+  `type` enum('MOVIE_RELEASE') NOT NULL,
+  `movie_id` bigint DEFAULT NULL,
+  `title` varchar(100) NOT NULL,
+  `message` varchar(1000) NOT NULL,
+  `is_read` bit(1) NOT NULL,
+  `event_key` varchar(100) NOT NULL,
+  `created_at` datetime(6) NOT NULL,
+  `updated_at` datetime(6) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_notifications_member_id_event_key` (`member_id`,`event_key`),
+  KEY `idx_notifications_member_id_is_read` (`member_id`,`is_read`),
+  KEY `idx_notifications_movie_id` (`movie_id`),
+  CONSTRAINT `fk_notifications_member_id` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`),
+  CONSTRAINT `fk_notifications_movie_id` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
