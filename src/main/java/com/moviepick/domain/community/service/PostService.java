@@ -23,6 +23,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -71,7 +73,7 @@ public class PostService {
                     .replace("_", "\\_");
         }
 
-        // 인기순: 게시글과 좋아요 수를 함께 조회
+        // 인기순: 전체 좋아요 수로 정렬해야 하므로 게시글과 좋아요 수를 함께 조회
         if ("popular".equalsIgnoreCase(sortType)) {
             Page<Object[]> results;
 
@@ -102,36 +104,25 @@ public class PostService {
             });
         }
 
-        // 최신순: 게시글과 좋아요 수를 함께 조회
-        Page<Object[]> results;
+        // 최신순: 인덱스(status, created_at)로 게시글 페이지만 먼저 조회
+        PageRequest latestPage = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
+        );
 
-        if (hasKeyword) {
-            results = postRepository.searchWithLikeCount(
-                    PostStatus.VISIBLE,
-                    keyword,
-                    PageRequest.of(
-                            pageable.getPageNumber(),
-                            pageable.getPageSize(),
-                            Sort.by(Sort.Direction.DESC, "createdAt")
-                    )
-            );
-        } else {
-            results = postRepository.findAllWithLikeCountByStatus(
-                    PostStatus.VISIBLE,
-                    PageRequest.of(
-                            pageable.getPageNumber(),
-                            pageable.getPageSize(),
-                            Sort.by(Sort.Direction.DESC, "createdAt")
-                    )
-            );
-        }
+        Page<Post> posts = hasKeyword
+                ? postRepository.searchByStatus(PostStatus.VISIBLE, keyword, latestPage)
+                : postRepository.findByStatus(PostStatus.VISIBLE, latestPage);
 
-        return results.map(row -> {
-            Post post = (Post) row[0];
-            long likeCount = ((Number) row[1]).longValue();
+        // 그 페이지의 좋아요 수만 한 번에 조회
+        Map<Long, Long> likeCounts = postLikeService.countLikesByPostIds(
+                posts.map(Post::getId).getContent());
 
-            return PostListResponse.from(post, likeCount);
-        });
+        return posts.map(post -> PostListResponse.from(
+                post,
+                likeCounts.getOrDefault(post.getId(), 0L)
+        ));
     }
 
     // 게시글 상세 조회
