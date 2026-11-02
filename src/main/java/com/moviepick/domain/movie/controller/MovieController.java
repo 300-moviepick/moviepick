@@ -1,7 +1,9 @@
 package com.moviepick.domain.movie.controller;
 
 import com.moviepick.domain.movie.dto.response.MovieDetailResponse;
+import com.moviepick.domain.movie.dto.response.MovieExtraResponse;
 import com.moviepick.domain.movie.dto.response.MovieListResponse;
+import com.moviepick.domain.movie.service.MovieExtraService;
 import com.moviepick.domain.movie.service.MovieQueryService;
 import com.moviepick.domain.movie.service.MovieReviewReader;
 import com.moviepick.global.security.LoginMember;
@@ -22,10 +24,10 @@ import org.springframework.web.bind.annotation.*;
 public class MovieController {
 
     private final MovieQueryService movieQueryService;
-    // 내 리뷰 ID 조회 (리뷰 도메인이 구현)
     private final MovieReviewReader movieReviewReader;
+    private final MovieExtraService movieExtraService;
 
-    // 영화 목록 조회 및 검색
+    // 영화 목록 및 검색
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<MovieListResponse>>> getMovies(
             @RequestParam(required = false) String keyword,
@@ -47,7 +49,9 @@ public class MovieController {
         Page<MovieListResponse> movies =
                 movieQueryService.getMovies(keyword, pageable);
 
-        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(movies)));
+        return ResponseEntity.ok(
+                ApiResponse.ok(PageResponse.from(movies))
+        );
     }
 
     // 영화 상세 조회
@@ -56,17 +60,22 @@ public class MovieController {
             @PathVariable Long movieId,
             @LoginMember(required = false) Long memberId
     ) {
-        // 로그인 사용자의 해당 영화 리뷰 ID 조회
-        // 비로그인 또는 작성한 리뷰가 없다면 null
         Long myReviewId = movieReviewReader
                 .findMyReviewId(memberId, movieId)
                 .orElse(null);
 
         return ResponseEntity.ok(ApiResponse.ok(
-                movieQueryService.getMovie(
-                        movieId,
-                        myReviewId
-                )
+                movieQueryService.getMovie(movieId, myReviewId)
         ));
+    }
+
+    // 영화 예고편·출연진·OTT 확장 정보
+    @GetMapping("/{movieId}/extras")
+    public ResponseEntity<ApiResponse<MovieExtraResponse>> getMovieExtras(
+            @PathVariable Long movieId
+    ) {
+        return ResponseEntity.ok(
+                ApiResponse.ok(movieExtraService.getExtras(movieId))
+        );
     }
 }

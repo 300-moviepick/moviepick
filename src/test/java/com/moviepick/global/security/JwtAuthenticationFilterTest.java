@@ -8,6 +8,7 @@ import com.moviepick.domain.member.exception.MemberErrorCode;
 import com.moviepick.domain.member.service.MemberService;
 import com.moviepick.domain.movie.controller.MovieController;
 import com.moviepick.domain.movie.service.MovieQueryService;
+import com.moviepick.domain.movie.service.MovieExtraService;
 import com.moviepick.domain.review.service.ReviewService;
 import com.moviepick.global.config.FilterErrorConfig;
 import com.moviepick.global.exception.BusinessException;
@@ -87,6 +88,8 @@ class JwtAuthenticationFilterTest {
     private JwtProvider jwtProvider;
     @MockitoBean
     private MovieQueryService movieQueryService;
+    @MockitoBean
+    private MovieExtraService movieExtraService;
     @MockitoBean
     private ReviewService reviewService;
     @MockitoBean
