@@ -18,6 +18,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -93,6 +97,18 @@ public class PostLikeService {
     // 게시글 상태와 관계없이 좋아요 수 조회 (관리자의 숨긴 글 상세용)
     public long countLikes(Long postId) {
         return postLikeRepository.countByPostId(postId);
+    }
+
+    // 목록용: 게시글 ID별 좋아요 수. 좋아요가 없는 게시글은 맵에 없으므로 getOrDefault(id, 0L)로 꺼낸다
+    public Map<Long, Long> countLikesByPostIds(List<Long> postIds) {
+        if (postIds.isEmpty()) {
+            return Map.of();
+        }
+        return postLikeRepository.countByPostIds(postIds).stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
     }
 
     // 특정 회원이 게시글에 좋아요를 눌렀는지 확인

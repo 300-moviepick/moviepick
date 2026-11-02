@@ -65,40 +65,19 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             Pageable pageable
     );
 
-    // 공개 게시글과 좋아요 수를 함께 조회
-    @Query(
-            value = """
-                    SELECT p, COUNT(pl.id)
-                    FROM Post p
-                    LEFT JOIN PostLike pl ON pl.post = p
-                    WHERE p.status = :status
-                    GROUP BY p
-                    ORDER BY p.createdAt DESC
-                    """,
-            countQuery = """
-                    SELECT COUNT(p)
-                    FROM Post p
-                    WHERE p.status = :status
-                    """
-    )
-    Page<Object[]> findAllWithLikeCountByStatus(
-            @Param("status") PostStatus status,
-            Pageable pageable
-    );
+    // 최신순 목록: 게시글만 페이지로 조회 (좋아요 수는 PostLikeRepository.countByPostIds로 따로)
+    Page<Post> findByStatus(PostStatus status, Pageable pageable);
 
-    // 제목 또는 본문 검색 결과와 좋아요 수를 함께 조회
+    // 최신순 검색: 제목 또는 본문 (좋아요 수는 따로 조회)
     @Query(
             value = """
-                    SELECT p, COUNT(pl.id)
+                    SELECT p
                     FROM Post p
-                    LEFT JOIN PostLike pl ON pl.post = p
                     WHERE p.status = :status
                       AND (
                           LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '\\'
                           OR LOWER(p.content) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '\\'
                       )
-                    GROUP BY p
-                    ORDER BY p.createdAt DESC
                     """,
             countQuery = """
                     SELECT COUNT(p)
@@ -110,7 +89,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
                       )
                     """
     )
-    Page<Object[]> searchWithLikeCount(
+    Page<Post> searchByStatus(
             @Param("status") PostStatus status,
             @Param("keyword") String keyword,
             Pageable pageable

@@ -20,10 +20,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -74,32 +77,29 @@ public class CommentService {
                 .orElseThrow(() ->
                         new BusinessException(PostErrorCode.POST_NOT_FOUND));
 
-        Pageable pageRequest = PageRequest.of(
-                pageable.getPageNumber(),
-                pageable.getPageSize()
-        );
-
         // 숨긴 댓글도 자리를 유지한다 (B1)
-        return commentRepository.findCommentsWithLikeCount(
+        Page<Comment> comments = commentRepository.findByPostIdAndStatusIn(
                 postId,
                 LISTED_STATUSES,
-                pageRequest
-        ).map(row -> {
-            Comment comment = (Comment) row[0];
-            long likeCount = ((Number) row[1]).longValue();
+                PageRequest.of(
+                        pageable.getPageNumber(),
+                        pageable.getPageSize(),
+                        Sort.by(Sort.Order.asc("createdAt"), Sort.Order.asc("id"))
+                )
+        );
 
-            boolean likedByMe = memberId != null
-                    && commentLikeService.isLikedByMember(
-                    comment.getId(),
-                    memberId
-            );
+        // 좋아요 수와 내 좋아요 여부는 페이지 단위로 한 번씩만 조회 (댓글마다 조회하지 않음)
+        List<Long> commentIds = comments.map(Comment::getId).getContent();
+        Map<Long, Long> likeCounts =
+                commentLikeService.countLikesByCommentIds(commentIds);
+        Set<Long> likedIds =
+                commentLikeService.findLikedCommentIds(memberId, commentIds);
 
-            return CommentListResponse.from(
-                    comment,
-                    likeCount,
-                    likedByMe
-            );
-        });
+        return comments.map(comment -> CommentListResponse.from(
+                comment,
+                likeCounts.getOrDefault(comment.getId(), 0L),
+                likedIds.contains(comment.getId())
+        ));
     }
 
     // 댓글 삭제 (댓글 ID 기준)

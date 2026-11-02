@@ -6,8 +6,6 @@ import com.moviepick.domain.community.entity.CommentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -27,27 +25,10 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
             Pageable pageable
     );
 
-    // 댓글과 좋아요 수를 함께 조회 (목록에 보일 상태들)
-    @Query(
-            value = """
-                    SELECT c, COUNT(cl.id)
-                    FROM Comment c
-                    LEFT JOIN CommentLike cl ON cl.comment = c
-                    WHERE c.post.id = :postId
-                      AND c.status IN :statuses
-                    GROUP BY c
-                    ORDER BY c.createdAt ASC
-                    """,
-            countQuery = """
-                    SELECT COUNT(c)
-                    FROM Comment c
-                    WHERE c.post.id = :postId
-                      AND c.status IN :statuses
-                    """
-    )
-    Page<Object[]> findCommentsWithLikeCount(
-            @Param("postId") Long postId,
-            @Param("statuses") Collection<CommentStatus> statuses,
+    // 목록에 보일 상태들의 댓글 페이지 조회 (좋아요 수·내 좋아요 여부는 CommentLikeRepository로 따로)
+    Page<Comment> findByPostIdAndStatusIn(
+            Long postId,
+            Collection<CommentStatus> statuses,
             Pageable pageable
     );
 }

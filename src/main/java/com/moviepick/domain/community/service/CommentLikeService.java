@@ -19,6 +19,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -86,6 +92,27 @@ public class CommentLikeService {
         long likeCount = commentLikeRepository.countByCommentId(commentId);
 
         return new CommentLikeResponse(false, likeCount);
+    }
+
+    // 목록용: 댓글 ID별 좋아요 수. 좋아요가 없는 댓글은 맵에 없으므로 getOrDefault(id, 0L)로 꺼낸다
+    public Map<Long, Long> countLikesByCommentIds(List<Long> commentIds) {
+        if (commentIds.isEmpty()) {
+            return Map.of();
+        }
+        return commentLikeRepository.countByCommentIds(commentIds).stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
+    }
+
+    // 목록용: 댓글 중 회원이 좋아요한 댓글 ID (비로그인이면 빈 집합)
+    public Set<Long> findLikedCommentIds(Long memberId, List<Long> commentIds) {
+        if (memberId == null || commentIds.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(
+                commentLikeRepository.findLikedCommentIds(memberId, commentIds));
     }
 
     // 특정 회원의 댓글 좋아요 여부 조회
