@@ -1,8 +1,11 @@
+
 package com.moviepick.domain.review.service;
 
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.service.MemberService;
 import com.moviepick.domain.movie.entity.Movie;
+import com.moviepick.domain.movie.event.MovieRankingCacheEvictEvent;
+import com.moviepick.domain.movie.exception.MovieErrorCode;
 import com.moviepick.domain.movie.repository.MovieRepository;
 import com.moviepick.domain.movie.service.MovieRatingService;
 import com.moviepick.domain.movie.service.MovieReviewReader;
@@ -19,7 +22,6 @@ import com.moviepick.domain.review.exception.ReviewErrorCode;
 import com.moviepick.domain.review.repository.ReviewLikeRepository;
 import com.moviepick.domain.review.repository.ReviewRepository;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.domain.movie.exception.MovieErrorCode;
 import com.moviepick.global.response.PageResponse;
 
 import java.math.BigDecimal;
@@ -33,6 +35,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -53,18 +56,23 @@ public class ReviewService implements MovieReviewReader {
     private final MemberService memberService;
     private final MovieRatingService movieRatingService;
     private final MovieRepository movieRepository;
-
+    private final ApplicationEventPublisher eventPublisher;
 
     // ===================== 작성 =====================
 
     @Transactional
-    public ReviewCreateResponse createReview(Long memberId, Long movieId, ReviewCreateRequest request) {
+    public ReviewCreateResponse createReview(
+            Long memberId,
+            Long movieId,
+            ReviewCreateRequest request
+    ) {
         BigDecimal rating = normalizeRating(request.rating());
-        Member member = memberService.getMember(memberId);   // [수정] getActiveMember → getMember
-        Movie movie = movieRatingService.getMovie(movieId);   // 없으면 기존과 같은 예외
+        Member member = memberService.getMember(memberId);
+        Movie movie = movieRatingService.getMovie(movieId);
         boolean spoiler = request.spoilerOrDefault();
 
-        // 영화 줄 쓰기 잠금을 먼저 잡는다. 리뷰 빈 자리 잠금보다 앞서야 같은 영화 작성이 한 줄로 서서 데드락이 안 난다
+        // 영화 쓰기 잠금을 먼저 잡는다.
+        // 리뷰 빈 자리 잠금보다 앞서야 같은 영화 작성이 한 줄로 서서 데드락이 안 난다.
         movieRepository.findByIdForUpdate(movieId);
 
         // 같은 (회원, 영화)의 기존 리뷰 상태에 따라 분기
@@ -73,25 +81,43 @@ public class ReviewService implements MovieReviewReader {
                 .orElseGet(() -> saveNew(member, movie, rating, request.content(), spoiler));
 
         movieRatingService.applyRating(movieId, rating, 1);
+
+        // 랭킹 캐시 삭제 이벤트 발행
+        eventPublisher.publishEvent(new MovieRankingCacheEvictEvent());
+
         return ReviewCreateResponse.from(review);
     }
 
-    private Review rewriteIfDeleted(Review existing, BigDecimal rating, String content, boolean spoiler) {
+    private Review rewriteIfDeleted(
+            Review existing,
+            BigDecimal rating,
+            String content,
+            boolean spoiler
+    ) {
         switch (existing.getStatus()) {
             case VISIBLE -> throw new BusinessException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
             case BLIND -> throw new BusinessException(ReviewErrorCode.REVIEW_BLINDED);
             default -> {
-                // [수정] 이전 좋아요 기록을 지운 뒤 덮어쓴다 (다시 쓴 리뷰는 좋아요 0부터 시작)
+                // 이전 좋아요 기록을 지운 뒤 덮어쓴다.
+                // 다시 쓴 리뷰는 좋아요 0부터 시작한다.
                 reviewLikeRepository.deleteAllByReviewId(existing.getId());
-                existing.rewrite(rating, content, spoiler);   // DELETED → VISIBLE
+                existing.rewrite(rating, content, spoiler);
             }
         }
         return existing;
     }
 
-    private Review saveNew(Member member, Movie movie, BigDecimal rating, String content, boolean spoiler) {
+    private Review saveNew(
+            Member member,
+            Movie movie,
+            BigDecimal rating,
+            String content,
+            boolean spoiler
+    ) {
         try {
-            return reviewRepository.saveAndFlush(Review.create(member, movie, rating, content, spoiler));
+            return reviewRepository.saveAndFlush(
+                    Review.create(member, movie, rating, content, spoiler)
+            );
         } catch (DataIntegrityViolationException e) {
             // 동시 요청으로 유니크 제약(member_id, movie_id)에 걸린 경우
             throw new BusinessException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
@@ -101,38 +127,72 @@ public class ReviewService implements MovieReviewReader {
     // ===================== 조회 =====================
 
     public PageResponse<ReviewResponse> getMovieReviews(
-            Long movieId, Long memberId, ReviewSort sort, int page, int size) {
-        movieRatingService.getMovie(movieId);   // 없으면 MOVIE_NOT_FOUND
+            Long movieId,
+            Long memberId,
+            ReviewSort sort,
+            int page,
+            int size
+    ) {
+        movieRatingService.getMovie(movieId);
 
         Page<Review> reviews = sort == ReviewSort.LIKES
-                ? reviewRepository.findByMovieIdOrderByLikes(movieId, LISTED_STATUSES, PageRequest.of(page, size))
+                ? reviewRepository.findByMovieIdOrderByLikes(
+                movieId, LISTED_STATUSES, PageRequest.of(page, size))
                 : reviewRepository.findByMovieIdAndStatusIn(
-                        movieId, LISTED_STATUSES, PageRequest.of(page, size, sort.getSort()));
+                movieId, LISTED_STATUSES,
+                PageRequest.of(page, size, sort.getSort()));
+
         Map<Long, Integer> likeCounts = countLikes(reviews.getContent());
         Set<Long> likedIds = findLikedReviewIds(memberId, reviews.getContent());
 
-        return PageResponse.from(reviews.map(r -> ReviewResponse.of(
-                r, likeCounts.getOrDefault(r.getId(), 0), likedIds.contains(r.getId()))));
+        return PageResponse.from(reviews.map(r ->
+                ReviewResponse.of(
+                        r,
+                        likeCounts.getOrDefault(r.getId(), 0),
+                        likedIds.contains(r.getId())
+                )
+        ));
     }
 
-    public PageResponse<ReviewWithMovieResponse> getReviews(ReviewSort sort, int page, int size) {
+    public PageResponse<ReviewWithMovieResponse> getReviews(
+            ReviewSort sort,
+            int page,
+            int size
+    ) {
         // 비활성 영화의 리뷰는 전체 목록에서 뺀다 (내 리뷰에는 남김)
         Page<Review> reviews = sort == ReviewSort.LIKES
-                ? reviewRepository.findAllOrderByLikes(LISTED_STATUSES, PageRequest.of(page, size))
+                ? reviewRepository.findAllOrderByLikes(
+                LISTED_STATUSES, PageRequest.of(page, size))
                 : reviewRepository.findByStatusInAndMovieActiveTrue(
-                        LISTED_STATUSES, PageRequest.of(page, size, sort.getSort()));
+                LISTED_STATUSES, PageRequest.of(page, size, sort.getSort()));
+
         Map<Long, Integer> likeCounts = countLikes(reviews.getContent());
+
         return PageResponse.from(reviews.map(r ->
-                ReviewWithMovieResponse.withAuthor(r, likeCounts.getOrDefault(r.getId(), 0))));
+                ReviewWithMovieResponse.withAuthor(
+                        r, likeCounts.getOrDefault(r.getId(), 0)
+                )
+        ));
     }
 
-    public PageResponse<ReviewWithMovieResponse> getMyReviews(Long memberId, int page, int size) {
+    public PageResponse<ReviewWithMovieResponse> getMyReviews(
+            Long memberId,
+            int page,
+            int size
+    ) {
         Page<Review> reviews = reviewRepository.findByMemberIdAndStatusIn(
-                memberId, LISTED_STATUSES,
-                PageRequest.of(page, size, ReviewSort.LATEST.getSort()));
+                memberId,
+                LISTED_STATUSES,
+                PageRequest.of(page, size, ReviewSort.LATEST.getSort())
+        );
+
         Map<Long, Integer> likeCounts = countLikes(reviews.getContent());
+
         return PageResponse.from(reviews.map(r ->
-                ReviewWithMovieResponse.forMine(r, likeCounts.getOrDefault(r.getId(), 0))));
+                ReviewWithMovieResponse.forMine(
+                        r, likeCounts.getOrDefault(r.getId(), 0)
+                )
+        ));
     }
 
     /**
@@ -144,14 +204,23 @@ public class ReviewService implements MovieReviewReader {
         if (memberId == null) {
             return Optional.empty();
         }
-        return reviewRepository.findIdByMemberIdAndMovieIdAndStatus(memberId, movieId, ReviewStatus.VISIBLE);
+
+        return reviewRepository.findIdByMemberIdAndMovieIdAndStatus(
+                memberId, movieId, ReviewStatus.VISIBLE
+        );
     }
 
     // ===================== 수정 =====================
 
     @Transactional
-    public ReviewUpdateResponse updateReview(Long memberId, Long reviewId, ReviewUpdateRequest request) {
-        BigDecimal newRating = request.rating() == null ? null : normalizeRating(request.rating());
+    public ReviewUpdateResponse updateReview(
+            Long memberId,
+            Long reviewId,
+            ReviewUpdateRequest request
+    ) {
+        BigDecimal newRating = request.rating() == null
+                ? null
+                : normalizeRating(request.rating());
 
         Review review = findReviewForUpdate(reviewId);
         review.validateModifiableBy(memberId);
@@ -167,12 +236,19 @@ public class ReviewService implements MovieReviewReader {
         // 평점이 바뀌면 차이만큼만 합계에 반영 (리뷰 수는 그대로)
         if (newRating != null) {
             BigDecimal delta = newRating.subtract(oldRating);
+
             if (delta.signum() != 0) {
-                movieRatingService.applyRating(review.getMovie().getId(), delta, 0);
+                movieRatingService.applyRating(
+                        review.getMovie().getId(), delta, 0
+                );
             }
         }
 
-        reviewRepository.flush();   // updatedAt 반영 후 응답 생성
+        reviewRepository.flush();
+
+        // 랭킹 캐시 삭제 이벤트 발행
+        eventPublisher.publishEvent(new MovieRankingCacheEvictEvent());
+
         return ReviewUpdateResponse.from(review);
     }
 
@@ -182,20 +258,33 @@ public class ReviewService implements MovieReviewReader {
     public void deleteReview(Long memberId, Long reviewId) {
         Review review = findReviewForUpdate(reviewId);
         review.validateModifiableBy(memberId);
-        review.delete();   // VISIBLE → DELETED
+        review.delete();
 
-        movieRatingService.applyRating(review.getMovie().getId(), review.getRating().negate(), -1);
+        movieRatingService.applyRating(
+                review.getMovie().getId(),
+                review.getRating().negate(),
+                -1
+        );
+
+        // 랭킹 캐시 삭제 이벤트 발행
+        eventPublisher.publishEvent(new MovieRankingCacheEvictEvent());
     }
 
     /**
-     * 관리자 파트(PATCH /api/admin/reviews/{reviewId}/blind)에서 호출. VISIBLE → BLIND + 평점 집계 차감을 한 트랜잭션으로 처리.
-     * 상태 변경은 조건부 UPDATE라서, 이미 BLIND/DELETED면 반영 행이 0 → 차감하지 않는다 (중복 블라인드·작성자 삭제와 겹쳐도 안전).
+     * 관리자 파트(PATCH /api/admin/reviews/{reviewId}/blind)에서 호출.
+     * VISIBLE → BLIND + 평점 집계 차감을 한 트랜잭션으로 처리.
+     * 상태 변경은 조건부 UPDATE라서, 이미 BLIND/DELETED면 반영 행이 0 → 차감하지 않는다.
      * 존재하지 않는 리뷰만 REVIEW_NOT_FOUND, 이미 숨겨진 리뷰는 아무것도 하지 않는다 (멱등).
      */
     @Transactional
     public void blind(Long reviewId) {
         int changed = reviewRepository.changeStatus(
-                reviewId, ReviewStatus.VISIBLE, ReviewStatus.BLIND, LocalDateTime.now());
+                reviewId,
+                ReviewStatus.VISIBLE,
+                ReviewStatus.BLIND,
+                LocalDateTime.now()
+        );
+
         if (changed == 0) {
             if (!reviewRepository.existsById(reviewId)) {
                 throw new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND);
@@ -205,14 +294,24 @@ public class ReviewService implements MovieReviewReader {
 
         // UPDATE로 이미 행 잠금을 잡았으므로, 잠금 조회로 최신 평점을 읽어 차감한다.
         Review review = findReviewForUpdate(reviewId);
-        movieRatingService.applyRating(review.getMovie().getId(), review.getRating().negate(), -1);
+
+        movieRatingService.applyRating(
+                review.getMovie().getId(),
+                review.getRating().negate(),
+                -1
+        );
+
+        // 랭킹 캐시 삭제 이벤트 발행
+        eventPublisher.publishEvent(new MovieRankingCacheEvictEvent());
     }
 
     // ===================== 내부 메서드 =====================
 
     private Review findReviewForUpdate(Long reviewId) {
         return reviewRepository.findByIdForUpdate(reviewId)
-                .orElseThrow(() -> new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND));
+                .orElseThrow(() ->
+                        new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND)
+                );
     }
 
     /**
@@ -223,23 +322,37 @@ public class ReviewService implements MovieReviewReader {
         return rating.setScale(1, RoundingMode.UNNECESSARY);
     }
 
-    /** 한 페이지 리뷰의 좋아요 수 (reviewId → 수). 좋아요가 없는 리뷰는 맵에 없으므로 getOrDefault(id, 0)로 꺼낸다 */
+    /**
+     * 한 페이지 리뷰의 좋아요 수 (reviewId → 수).
+     * 좋아요가 없는 리뷰는 맵에 없으므로 getOrDefault(id, 0)로 꺼낸다.
+     */
     private Map<Long, Integer> countLikes(List<Review> reviews) {
         if (reviews.isEmpty()) {
             return Map.of();
         }
-        List<Long> ids = reviews.stream().map(Review::getId).toList();
+
+        List<Long> ids = reviews.stream()
+                .map(Review::getId)
+                .toList();
+
         return reviewLikeRepository.countByReviewIds(ids).stream()
                 .collect(Collectors.toMap(
                         row -> (Long) row[0],
-                        row -> Math.toIntExact((Long) row[1])));
+                        row -> Math.toIntExact((Long) row[1])
+                ));
     }
 
     private Set<Long> findLikedReviewIds(Long memberId, List<Review> reviews) {
         if (memberId == null || reviews.isEmpty()) {
             return Set.of();
         }
-        List<Long> ids = reviews.stream().map(Review::getId).toList();
-        return new HashSet<>(reviewLikeRepository.findLikedReviewIds(memberId, ids));
+
+        List<Long> ids = reviews.stream()
+                .map(Review::getId)
+                .toList();
+
+        return new HashSet<>(
+                reviewLikeRepository.findLikedReviewIds(memberId, ids)
+        );
     }
 }
