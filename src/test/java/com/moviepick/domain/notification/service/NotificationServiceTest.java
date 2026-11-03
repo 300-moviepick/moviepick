@@ -96,6 +96,30 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("한국 개봉일이 있으면 한국 개봉일 기준으로 알림을 만들고, 없으면 기본 개봉일을 쓴다")
+    void releaseDateKrFirst() {
+        // 기본 개봉일은 다른 날이지만 한국 개봉일이 오늘 → 알림
+        Movie koreaToday = saveMovie(2L, "한국 오늘", TODAY.minusDays(10));
+        ReflectionTestUtils.setField(koreaToday, "releaseDateKr", TODAY);
+        movieRepository.save(koreaToday);
+        // 기본 개봉일은 오늘이지만 한국 개봉일이 다음 주 → 알림 없음
+        Movie koreaLater = saveMovie(3L, "한국 나중", TODAY);
+        ReflectionTestUtils.setField(koreaLater, "releaseDateKr", TODAY.plusDays(7));
+        movieRepository.save(koreaLater);
+        wishlistRepository.save(Wishlist.create(member, koreaToday));
+        wishlistRepository.save(Wishlist.create(member, koreaLater));
+        // releasingMovie: 한국 개봉일 없음, 기본 개봉일 오늘 → 알림
+        wishlistRepository.save(Wishlist.create(member, releasingMovie));
+
+        int created = notificationService.createMovieReleaseNotifications(TODAY);
+
+        assertThat(created).isEqualTo(2);
+        assertThat(notificationService.getMyNotifications(member.getId(), 0, 20).content())
+                .extracting(NotificationResponse::movieId)
+                .containsExactlyInAnyOrder(koreaToday.getId(), releasingMovie.getId());
+    }
+
+    @Test
     @DisplayName("내 알림 목록은 최신순이고 다른 회원 알림은 보이지 않는다")
     void getMyNotifications() {
         Movie second = saveMovie(2L, "영화 B", TODAY);

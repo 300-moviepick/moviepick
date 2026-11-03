@@ -63,7 +63,7 @@ public class NotificationService {
      */
     @Transactional
     public int createMovieReleaseNotifications(LocalDate releaseDate) {
-        // TODO: 한국 개봉일(release_date_kr) 수집 방식 확정 후 "release_date_kr, 없으면 release_date"로 바꾼다
+        // 개봉일 기준: release_date_kr, 없으면 release_date (WishlistRepository.findReleaseTargets)
         List<Wishlist> targets = wishlistRepository.findReleaseTargets(releaseDate, MemberStatus.WITHDRAWN);
         if (targets.isEmpty()) {
             return 0;
