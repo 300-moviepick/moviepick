@@ -21,6 +21,7 @@ import com.moviepick.domain.review.repository.ReviewRepository;
 import com.moviepick.global.exception.BusinessException;
 import com.moviepick.domain.movie.exception.MovieErrorCode;
 import com.moviepick.global.response.PageResponse;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -56,7 +57,7 @@ public class ReviewService implements MovieReviewReader {
 
 
     // ===================== 작성 =====================
-
+    @CacheEvict(cacheNames = "movieRanking", allEntries = true)
     @Transactional
     public ReviewCreateResponse createReview(Long memberId, Long movieId, ReviewCreateRequest request) {
         BigDecimal rating = normalizeRating(request.rating());
@@ -149,6 +150,7 @@ public class ReviewService implements MovieReviewReader {
 
     // ===================== 수정 =====================
 
+    @CacheEvict(cacheNames = "movieRanking", allEntries = true)
     @Transactional
     public ReviewUpdateResponse updateReview(Long memberId, Long reviewId, ReviewUpdateRequest request) {
         BigDecimal newRating = request.rating() == null ? null : normalizeRating(request.rating());
@@ -178,6 +180,7 @@ public class ReviewService implements MovieReviewReader {
 
     // ===================== 삭제 =====================
 
+    @CacheEvict(cacheNames = "movieRanking", allEntries = true)
     @Transactional
     public void deleteReview(Long memberId, Long reviewId) {
         Review review = findReviewForUpdate(reviewId);
@@ -192,6 +195,7 @@ public class ReviewService implements MovieReviewReader {
      * 상태 변경은 조건부 UPDATE라서, 이미 BLIND/DELETED면 반영 행이 0 → 차감하지 않는다 (중복 블라인드·작성자 삭제와 겹쳐도 안전).
      * 존재하지 않는 리뷰만 REVIEW_NOT_FOUND, 이미 숨겨진 리뷰는 아무것도 하지 않는다 (멱등).
      */
+    @CacheEvict(cacheNames = "movieRanking", allEntries = true)
     @Transactional
     public void blind(Long reviewId) {
         int changed = reviewRepository.changeStatus(
