@@ -30,7 +30,7 @@ public class TmdbClient {
     private static final long MAX_RETRY_AFTER_MILLIS = 30_000L;
 
     private static final String APPEND_TO_RESPONSE =
-            "videos,credits,watch/providers";
+            "videos,credits,watch/providers,release_dates";
 
     private final RestClient restClient;
     private final RetrySleeper retrySleeper;

@@ -97,6 +97,19 @@ class TmdbClientRetryTest {
                     ]
                   }
                 }
+              },
+              "release_dates": {
+                "results": [
+                  {
+                    "iso_3166_1": "KR",
+                    "release_dates": [
+                      {
+                        "release_date": "2026-11-01T00:00:00.000Z",
+                        "type": 3
+                      }
+                    ]
+                  }
+                ]
               }
             }
             """;
@@ -362,6 +375,18 @@ class TmdbClientRetryTest {
                 koreanProviders.flatrate().get(0).providerName()
         );
 
+        // 국가별 개봉일
+        assertNotNull(response.releaseDates());
+
+        var koreanRelease = response.releaseDates().results().get(0);
+
+        assertEquals("KR", koreanRelease.country());
+        assertEquals(
+                "2026-11-01T00:00:00.000Z",
+                koreanRelease.releaseDates().get(0).releaseDate()
+        );
+        assertEquals(3, koreanRelease.releaseDates().get(0).type());
+
         assertTrue(retryDelays.isEmpty());
         server.verify();
     }
@@ -383,7 +408,7 @@ class TmdbClientRetryTest {
             assertTrue(query.contains("language=ko-KR"));
 
             assertTrue(query.contains(
-                    "append_to_response=videos,credits,watch/providers"
+                    "append_to_response=videos,credits,watch/providers,release_dates"
             ));
         };
     }

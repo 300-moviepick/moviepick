@@ -12,12 +12,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 // 수집한 영화·장르 저장 및 동기화
 public class MovieSaveService {
+
+    private static final String KOREA = "KR";
+
+    // TMDB 개봉 종류: 3 극장 개봉, 2 제한 상영 (우선순위 순)
+    private static final int[] THEATRICAL_TYPES = {3, 2};
 
     private final MovieRepository movieRepository;
     private final MovieGenreRepository movieGenreRepository;
@@ -67,7 +73,8 @@ public class MovieSaveService {
                 response.voteCount(),
                 response.popularity(),
                 response.posterPath(),
-                response.backdropPath()
+                response.backdropPath(),
+                findKoreanReleaseDate(response.releaseDates())
         );
 
         // 5. 영화 정보 갱신
@@ -85,6 +92,47 @@ public class MovieSaveService {
         movie.markSynced(LocalDateTime.now());
 
         return movie.getId();
+    }
+
+    // 한국(KR) 극장 개봉일 추출
+    // 극장 개봉(3)을 먼저 보고, 없으면 제한 상영(2)을 본다. 같은 종류가 여러 건이면 가장 빠른 날짜.
+    // 디지털·TV 공개만 있거나 KR 정보가 없으면 null
+    LocalDate findKoreanReleaseDate(TmdbMovieResponse.ReleaseDatesResponse releaseDates) {
+        if (releaseDates == null || releaseDates.results() == null) {
+            return null;
+        }
+
+        List<TmdbMovieResponse.ReleaseDateResponse> krDates = releaseDates.results().stream()
+                .filter(country -> country != null && KOREA.equals(country.country()))
+                .filter(country -> country.releaseDates() != null)
+                .flatMap(country -> country.releaseDates().stream())
+                .filter(Objects::nonNull)
+                .toList();
+
+        for (int type : THEATRICAL_TYPES) {
+            Optional<LocalDate> earliest = krDates.stream()
+                    .filter(date -> date.type() != null && date.type() == type)
+                    .map(date -> parseReleaseDate(date.releaseDate()))
+                    .filter(Objects::nonNull)
+                    .min(Comparator.naturalOrder());
+
+            if (earliest.isPresent()) {
+                return earliest.get();
+            }
+        }
+        return null;
+    }
+
+    // "2026-11-01T00:00:00.000Z" → 2026-11-01 (앞 10자리 날짜만 사용)
+    private LocalDate parseReleaseDate(String value) {
+        if (value == null || value.length() < 10) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.substring(0, 10));
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 
     // 영화 장르 동기화
