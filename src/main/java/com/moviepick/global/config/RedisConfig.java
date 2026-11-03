@@ -3,7 +3,9 @@ package com.moviepick.global.config;
 
 import java.time.Duration;
 
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -17,14 +19,15 @@ import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 
 @Configuration
 @EnableCaching
-public class RedisConfig {
+public class RedisConfig implements CachingConfigurer {
 
     @Bean
     public RedisCacheManager cacheManager(
             RedisConnectionFactory connectionFactory
     ) {
         var typeValidator = BasicPolymorphicTypeValidator.builder()
-                .allowIfSubType("com.moviepick.")
+                .allowIfSubType("com.moviepick.global.response.")
+                .allowIfSubType("com.moviepick.domain.movie.dto.response.")
                 .allowIfSubType("java.util.")
                 .allowIfSubType("java.time.")
                 .allowIfSubType("java.math.")
@@ -36,19 +39,12 @@ public class RedisConfig {
 
         RedisCacheConfiguration configuration =
                 RedisCacheConfiguration.defaultCacheConfig()
-                        // 캐시 유효시간 5분
                         .entryTtl(Duration.ofMinutes(5))
-
-                        // null 값은 캐싱하지 않음
                         .disableCachingNullValues()
-
-                        // Redis Key는 문자열로 저장
                         .serializeKeysWith(
                                 RedisSerializationContext.SerializationPair
                                         .fromSerializer(new StringRedisSerializer())
                         )
-
-                        // Redis Value는 JSON으로 저장
                         .serializeValuesWith(
                                 RedisSerializationContext.SerializationPair
                                         .fromSerializer(valueSerializer)
@@ -58,5 +54,10 @@ public class RedisConfig {
                 .cacheDefaults(configuration)
                 .transactionAware()
                 .build();
+    }
+
+    @Override
+    public CacheErrorHandler errorHandler() {
+        return new RedisCacheErrorHandler();
     }
 }

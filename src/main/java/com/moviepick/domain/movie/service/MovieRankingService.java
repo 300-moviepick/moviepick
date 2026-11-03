@@ -4,11 +4,11 @@ import com.moviepick.domain.movie.dto.response.MovieRankingResponse;
 import com.moviepick.domain.movie.repository.MovieRankingRepository;
 import com.moviepick.global.response.PageResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.cache.annotation.Cacheable;
 
 @Service
 @RequiredArgsConstructor
@@ -19,7 +19,8 @@ public class MovieRankingService {
 
     @Cacheable(
             cacheNames = "movieRanking",
-            key = "#page + '-' + #size"
+            key = "#page + '-' + #size",
+            unless = "#result.content.isEmpty()"
     )
     public PageResponse<MovieRankingResponse> getRanking(int page, int size) {
         PageRequest pageable = PageRequest.of(page, size);
