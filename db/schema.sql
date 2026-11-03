@@ -107,6 +107,7 @@ CREATE TABLE `movies` (
   `popularity` double DEFAULT NULL,
   `rating_sum` decimal(12,1) NOT NULL,
   `release_date` date DEFAULT NULL,
+  `release_date_kr` date DEFAULT NULL,
   `review_count` int NOT NULL,
   `runtime_minutes` int DEFAULT NULL,
   `vote_average` double DEFAULT NULL,

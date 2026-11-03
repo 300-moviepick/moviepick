@@ -10,7 +10,7 @@ public record WishlistMovieResponse(
         String title,
         String posterUrl,
         LocalDate releaseDate,
-        // TODO: 한국 개봉일 수집 방식 확정 후 movies.release_date_kr 값으로 채운다 (현재 항상 null)
+        // 한국 극장 개봉일 (TMDB에 KR 정보가 없으면 null)
         LocalDate releaseDateKr,
         LocalDateTime wishlistedAt
 ) {
@@ -21,7 +21,7 @@ public record WishlistMovieResponse(
                 movie.getTitle(),
                 movie.getPosterUrl(),
                 movie.getReleaseDate(),
-                null,
+                movie.getReleaseDateKr(),
                 wishlist.getCreatedAt());
     }
 }

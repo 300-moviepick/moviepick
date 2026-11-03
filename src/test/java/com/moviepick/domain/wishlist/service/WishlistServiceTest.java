@@ -18,6 +18,7 @@ import com.moviepick.global.exception.BusinessException;
 import com.moviepick.global.exception.ErrorCode;
 import com.moviepick.global.response.PageResponse;
 import com.moviepick.global.security.RefreshTokenService;
+import java.time.LocalDate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -122,6 +123,19 @@ class WishlistServiceTest {
                 .extracting(WishlistMovieResponse::movieId)
                 .containsExactly(secondMovieId, movieId);
         assertThat(response.content().get(0).title()).isEqualTo("second");
+    }
+
+    @Test
+    @DisplayName("내 찜 목록에 한국 개봉일이 담긴다")
+    void getMyWishlistWithReleaseDateKr() {
+        Movie movie = movieRepository.findById(movieId).orElseThrow();
+        ReflectionTestUtils.setField(movie, "releaseDateKr", LocalDate.of(2026, 11, 1));
+        movieRepository.save(movie);
+        wishlistService.addWishlist(memberId, movieId);
+
+        WishlistMovieResponse response = wishlistService.getMyWishlist(memberId, 0, 20).content().get(0);
+
+        assertThat(response.releaseDateKr()).isEqualTo(LocalDate.of(2026, 11, 1));
     }
 
     private void assertErrorCode(Runnable action, ErrorCode expected) {
