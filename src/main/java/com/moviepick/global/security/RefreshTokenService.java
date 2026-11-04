@@ -32,17 +32,6 @@ public class RefreshTokenService {
         );
     }
 
-    // Refresh Token 유효성 확인
-    public boolean isValid(Long memberId, String refreshToken) {
-
-        String key = createKey(refreshToken);
-
-        String savedMemberId =
-                redisTemplate.opsForValue().get(key);
-
-        return memberId.toString().equals(savedMemberId);
-    }
-
     // Refresh Token 삭제
     public void delete(String refreshToken) {
 
@@ -85,4 +74,9 @@ public class RefreshTokenService {
         redisTemplate.opsForValue().increment(key);
     }
 
+    // Refresh Token을 꺼내면서 삭제한다 (한 번만 사용 가능)
+    public boolean consume(Long memberId, String refreshToken) {
+        String savedMemberId = redisTemplate.opsForValue().getAndDelete(createKey(refreshToken));
+        return memberId.toString().equals(savedMemberId);
+    }
 }
