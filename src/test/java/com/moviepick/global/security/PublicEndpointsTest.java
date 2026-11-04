@@ -27,7 +27,9 @@ class PublicEndpointsTest {
             "GET, /api/community/posts/1, true",
             "GET, /api/community/posts/1/comments, true",
             "GET, /api/community/posts/1/likes, true",
-            "POST, /api/webhooks/portone, true",
+            "GET, /api/movies/1/extras, true",
+            "GET, /api/movies/ranking, true",
+            "POST, /api/webhooks/portone, false",
             // 같은 주소라도 메서드가 다르면 보호
             "POST, /api/movies/1/reviews, false",
             "POST, /api/community/posts, false",
