@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.cache.annotation.Cacheable;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +20,7 @@ public class MovieExtraService {
     private final MovieRepository movieRepository;
     private final TmdbClient tmdbClient;
 
+    @Cacheable(cacheNames = "movieExtras", key = "#movieId")
     public MovieExtraResponse getExtras(Long movieId) {
 
         // MoviePick 내부 영화 ID로 조회

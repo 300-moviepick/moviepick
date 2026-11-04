@@ -54,6 +54,10 @@ public class RedisConfig implements CachingConfigurer {
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(configuration)
+                .withCacheConfiguration("movieRanking",
+                        configuration.entryTtl(Duration.ofMinutes(5)))
+                .withCacheConfiguration("movieExtras",
+                        configuration.entryTtl(Duration.ofHours(12)))
                 .transactionAware()
                 .build();
     }

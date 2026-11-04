@@ -42,8 +42,8 @@ public final class PublicEndpoints {
         // 게시글 좋아요 수 조회
         add(HttpMethod.GET, "/api/community/posts/*/likes");
 
-        // PortOne 결제 웹훅
-        add(HttpMethod.POST, "/api/webhooks/portone");
+        // 영화 목록, 상세, 랭킹, 확장 정보 조회
+        add(HttpMethod.GET, "/api/movies", "/api/movies/*", "/api/movies/*/extras");
     }
 
     public static final RequestMatcher MATCHER = new OrRequestMatcher(MATCHERS);
