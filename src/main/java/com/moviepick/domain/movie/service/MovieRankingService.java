@@ -1,33 +1,40 @@
+
 package com.moviepick.domain.movie.service;
 
 import com.moviepick.domain.movie.dto.response.MovieRankingResponse;
-import com.moviepick.domain.movie.repository.MovieRankingRepository;
 import com.moviepick.global.response.PageResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MovieRankingService {
 
-    private final MovieRankingRepository movieRankingRepository;
+    private final MovieRankingVersionService movieRankingVersionService;
+    private final MovieRankingCacheService movieRankingCacheService;
 
-    @Cacheable(
-            cacheNames = "movieRanking",
-            key = "#page + '-' + #size",
-            unless = "#result.content.isEmpty()"
-    )
     public PageResponse<MovieRankingResponse> getRanking(int page, int size) {
-        PageRequest pageable = PageRequest.of(page, size);
 
-        Page<MovieRankingResponse> rankingPage =
-                movieRankingRepository.findRanking(pageable);
+        try {
+            // Redis에서 현재 랭킹 버전 조회
+            long version = movieRankingVersionService.getVersion();
 
-        return PageResponse.from(rankingPage);
+            // 정상이라면 Redis 캐시를 사용하는 랭킹 조회
+            return movieRankingCacheService.getRanking(version, page, size);
+
+        } catch (Exception e) {
+            log.warn("랭킹 Redis 조회 실패. DB에서 직접 조회합니다.", e);
+
+            PageResponse<MovieRankingResponse> result =
+                    movieRankingCacheService.getRankingWithoutCache(page, size);
+
+            log.info("Redis 장애 fallback DB 조회 성공");
+
+            return result;
+        }
     }
 }

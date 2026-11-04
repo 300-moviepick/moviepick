@@ -3,6 +3,7 @@ package com.moviepick.global.config;
 
 import java.time.Duration;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.interceptor.CacheErrorHandler;
@@ -17,6 +18,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 
+@Slf4j
 @Configuration
 @EnableCaching
 public class RedisConfig implements CachingConfigurer {
@@ -57,7 +59,9 @@ public class RedisConfig implements CachingConfigurer {
     }
 
     @Override
+    @Bean
     public CacheErrorHandler errorHandler() {
+        log.info("RedisCacheErrorHandler 등록");
         return new RedisCacheErrorHandler();
     }
 }
