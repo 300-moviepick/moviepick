@@ -114,9 +114,6 @@ public class SecurityConfig {
                         .csrfTokenRequestHandler(
                                 new CsrfTokenRequestAttributeHandler()
                         )
-                        .ignoringRequestMatchers(
-                                "/api/webhooks/portone"
-                        )
                         // JWT 인증 요청마다 CSRF 토큰을 교체하지 않음
                         .sessionAuthenticationStrategy(
                                 new NullAuthenticatedSessionStrategy()
