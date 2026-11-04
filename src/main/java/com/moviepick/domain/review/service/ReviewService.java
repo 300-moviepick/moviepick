@@ -72,7 +72,6 @@ public class ReviewService implements MovieReviewReader {
         boolean spoiler = request.spoilerOrDefault();
 
         // 영화 쓰기 잠금을 먼저 잡는다.
-        // 리뷰 빈 자리 잠금보다 앞서야 같은 영화 작성이 한 줄로 서서 데드락이 안 난다.
         movieRepository.findByIdForUpdate(movieId);
 
         // 같은 (회원, 영화)의 기존 리뷰 상태에 따라 분기
@@ -222,10 +221,20 @@ public class ReviewService implements MovieReviewReader {
                 ? null
                 : normalizeRating(request.rating());
 
+        // 1. 리뷰가 속한 영화 ID 조회
+        Long movieId = findMovieId(reviewId);
+
+        // 2. 영화 쓰기 락 먼저 획득
+        movieRepository.findByIdForUpdate(movieId)
+                .orElseThrow(() ->
+                        new BusinessException(MovieErrorCode.MOVIE_NOT_FOUND)
+                );
+
+        // 3. 리뷰 쓰기 락 획득
         Review review = findReviewForUpdate(reviewId);
         review.validateModifiableBy(memberId);
 
-        // 비활성 영화의 리뷰는 수정할 수 없다 (삭제는 허용)
+        // 비활성 영화의 리뷰는 수정할 수 없다
         if (!review.getMovie().isActive()) {
             throw new BusinessException(MovieErrorCode.MOVIE_NOT_FOUND);
         }
@@ -238,9 +247,7 @@ public class ReviewService implements MovieReviewReader {
             BigDecimal delta = newRating.subtract(oldRating);
 
             if (delta.signum() != 0) {
-                movieRatingService.applyRating(
-                        review.getMovie().getId(), delta, 0
-                );
+                movieRatingService.applyRating(movieId, delta, 0);
             }
         }
 
@@ -256,12 +263,23 @@ public class ReviewService implements MovieReviewReader {
 
     @Transactional
     public void deleteReview(Long memberId, Long reviewId) {
+
+        // 1. 리뷰가 속한 영화 ID 조회
+        Long movieId = findMovieId(reviewId);
+
+        // 2. 영화 쓰기 락 먼저 획득
+        movieRepository.findByIdForUpdate(movieId)
+                .orElseThrow(() ->
+                        new BusinessException(MovieErrorCode.MOVIE_NOT_FOUND)
+                );
+
+        // 3. 리뷰 쓰기 락 획득
         Review review = findReviewForUpdate(reviewId);
         review.validateModifiableBy(memberId);
         review.delete();
 
         movieRatingService.applyRating(
-                review.getMovie().getId(),
+                movieId,
                 review.getRating().negate(),
                 -1
         );
@@ -273,11 +291,21 @@ public class ReviewService implements MovieReviewReader {
     /**
      * 관리자 파트(PATCH /api/admin/reviews/{reviewId}/blind)에서 호출.
      * VISIBLE → BLIND + 평점 집계 차감을 한 트랜잭션으로 처리.
-     * 상태 변경은 조건부 UPDATE라서, 이미 BLIND/DELETED면 반영 행이 0 → 차감하지 않는다.
-     * 존재하지 않는 리뷰만 REVIEW_NOT_FOUND, 이미 숨겨진 리뷰는 아무것도 하지 않는다 (멱등).
+     * 영화 락을 먼저 획득한 후 조건부 UPDATE를 실행한다.
      */
     @Transactional
     public void blind(Long reviewId) {
+
+        // 1. 리뷰가 속한 영화 ID 조회
+        Long movieId = findMovieId(reviewId);
+
+        // 2. 영화 쓰기 락 먼저 획득
+        movieRepository.findByIdForUpdate(movieId)
+                .orElseThrow(() ->
+                        new BusinessException(MovieErrorCode.MOVIE_NOT_FOUND)
+                );
+
+        // 3. 영화 락을 확보한 상태에서 리뷰 상태 변경
         int changed = reviewRepository.changeStatus(
                 reviewId,
                 ReviewStatus.VISIBLE,
@@ -292,11 +320,11 @@ public class ReviewService implements MovieReviewReader {
             return;
         }
 
-        // UPDATE로 이미 행 잠금을 잡았으므로, 잠금 조회로 최신 평점을 읽어 차감한다.
+        // UPDATE로 리뷰 행 잠금을 잡았으므로 최신 평점을 조회한다.
         Review review = findReviewForUpdate(reviewId);
 
         movieRatingService.applyRating(
-                review.getMovie().getId(),
+                movieId,
                 review.getRating().negate(),
                 -1
         );
@@ -306,6 +334,17 @@ public class ReviewService implements MovieReviewReader {
     }
 
     // ===================== 내부 메서드 =====================
+
+    /**
+     * 리뷰가 속한 영화 ID 조회.
+     * 실제 쓰기 잠금은 이 조회 이후 영화부터 획득한다.
+     */
+    private Long findMovieId(Long reviewId) {
+        return reviewRepository.findMovieIdByReviewId(reviewId)
+                .orElseThrow(() ->
+                        new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND)
+                );
+    }
 
     private Review findReviewForUpdate(Long reviewId) {
         return reviewRepository.findByIdForUpdate(reviewId)
