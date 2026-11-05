@@ -12,3 +12,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+
+# PortOne 웹훅 서명 검증용 테스트 전용 더미 시크릿 (실제 값 아님)
+portone:
+  webhook-secret: whsec_bW92aWVwaWNrLXRlc3Qtb25seS13ZWJob29rLXNlY3JldA==

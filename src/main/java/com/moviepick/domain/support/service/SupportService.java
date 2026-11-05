@@ -85,7 +85,7 @@ public class SupportService {
                 .orElseGet(() -> pending(payment));   // PortOne에 결제 건이 아직 없음
     }
 
-    private SupportConfirmResponse applyPortOneResult(Payment payment, PortOnePayment portOnePayment) {
+    SupportConfirmResponse applyPortOneResult(Payment payment, PortOnePayment portOnePayment) {
         String paymentId = payment.getPaymentId();
 
         return switch (portOnePayment.status()) {
