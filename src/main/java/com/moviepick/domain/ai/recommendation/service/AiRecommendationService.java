@@ -33,9 +33,10 @@ public class AiRecommendationService {
     private static final int CANDIDATE_LIMIT = 3;
 
     private final AiMovieCandidateService candidateService;
-
-    // [추가 ①] 영화 관련성 점수 계산
     private final AiMovieRankingService rankingService;
+
+    // [추가] 회원별 장르 선호도 분석
+    private final AiMemberGenrePreferenceService preferenceService;
 
     private final AiMovieReasonGenerator reasonGenerator;
 
@@ -43,14 +44,14 @@ public class AiRecommendationService {
     private final AiCreditCompleteService completeService;
     private final AiCreditRestoreService restoreService;
 
-    // 외부 AI 호출 중 DB 트랜잭션을 유지하지 않는다.
+    // Ollama 호출 중 DB 트랜잭션을 유지하지 않는다.
     public AiRecommendResponse recommend(
             Long memberId,
             AiRecommendRequest request
     ) {
         String requestKey = request.requestKey().toString();
 
-        // [변경 ②] 랭킹을 위한 영화 후보 확보
+        // ① 영화 후보 확보
         List<AiMovieCandidate> candidatePool =
                 candidateService.findCandidatesForRanking();
 
@@ -60,12 +61,20 @@ public class AiRecommendationService {
             );
         }
 
-        // [추가 ③] 사용자 요청과 관련성 높은 상위 3편 선정
+        // [추가 ②] 회원 리뷰에서 장르별 선호 점수 조회
+        Map<String, Double> genreWeights =
+                preferenceService.getGenreWeights(memberId);
+
+        // [변경 ③] 관련성 + 개인화 점수를 합산해 상위 3편 선정
         List<AiMovieCandidate> candidates =
                 rankingService.rank(
                         request.prompt(),
                         candidatePool,
-                        CANDIDATE_LIMIT
+                        CANDIDATE_LIMIT,
+                        movie -> preferenceService.scoreGenrePreference(
+                                movie,
+                                genreWeights
+                        )
                 );
 
         if (candidates.isEmpty()) {
@@ -74,7 +83,7 @@ public class AiRecommendationService {
             );
         }
 
-        // ④ 기존: 크레딧 1회 차감
+        // ④ 크레딧 차감
         var spendResult = spendService.spendOne(
                 memberId,
                 requestKey
@@ -89,7 +98,7 @@ public class AiRecommendationService {
         List<AiRecommendedMovie> movies;
 
         try {
-            // ⑤ 기존: 랭킹된 영화에 대한 AI 추천 이유 생성
+            // ⑤ AI 추천 이유 생성
             List<AiMovieReason> reasons =
                     reasonGenerator.generate(
                             request.prompt(),
@@ -100,6 +109,7 @@ public class AiRecommendationService {
 
         } catch (RuntimeException aiFailure) {
 
+            // ⑥ AI 실패 시 크레딧 복구
             try {
                 restoreService.restoreOne(memberId, requestKey);
 
@@ -127,7 +137,7 @@ public class AiRecommendationService {
             );
         }
 
-        // ⑥ 기존: 추천 성공 확정
+        // ⑦ 추천 성공 확정
         completeService.completeOne(memberId, requestKey);
 
         return new AiRecommendResponse(
@@ -153,7 +163,6 @@ public class AiRecommendationService {
         Map<Long, String> reasonMap = new HashMap<>();
 
         for (AiMovieReason item : reasons) {
-
             if (item == null
                     || item.movieId() == null
                     || !candidateIds.contains(item.movieId())

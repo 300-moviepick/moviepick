@@ -223,4 +223,29 @@ class AiMemberGenrePreferenceServiceTest {
                 null
         );
     }
+
+    @Test
+    void 보통_평점도_장르_평균에_포함한다() {
+
+        givenReviews(
+                review(101L, "5.0"),
+                review(102L, "3.0")
+        );
+
+        MovieGenre firstGenre = genre(101L, "SF");
+        MovieGenre secondGenre = genre(102L, "SF");
+
+        given(movieGenreRepository.findAllByMovie_IdIn(
+                List.of(101L, 102L)
+        )).willReturn(List.of(
+                firstGenre,
+                secondGenre
+        ));
+
+        Map<String, Double> result =
+                preferenceService.getGenreWeights(MEMBER_ID);
+
+        assertThat(result)
+                .containsEntry("sf", 4.0);
+    }
 }
