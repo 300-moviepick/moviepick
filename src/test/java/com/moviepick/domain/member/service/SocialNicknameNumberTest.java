@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 
+import com.moviepick.domain.ai.credit.service.AiSignupCreditService;
 import com.moviepick.domain.member.entity.AuthProvider;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.repository.MemberRepository;
@@ -20,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,9 @@ class SocialNicknameNumberTest {
     private SocialMemberRegistrar socialMemberRegistrar;
     @MockitoSpyBean
     private MemberRepository memberRepository;
+    // [AI 추가] 기존 회원 도메인 테스트에서 무료 지급 호출 대체
+    @MockitoBean
+    private AiSignupCreditService aiSignupCreditService;
 
     @AfterEach
     void tearDown() {

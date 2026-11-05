@@ -1,4 +1,15 @@
 spring:
+  ai:
+    model:
+      chat: ${AI_CHAT_PROVIDER:none}
+      embedding: none
+      image: none
+      moderation: none
+
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: qwen3:4b
   profiles:
     active: local
   # 프로젝트 맨 위의 .env를 설정으로 읽는다 (없으면 무시). docker compose와 같은 파일

@@ -3,6 +3,7 @@ package com.moviepick.domain.member.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.moviepick.domain.ai.credit.service.AiSignupCreditService;
 import com.moviepick.domain.member.dto.request.LoginRequest;
 import com.moviepick.domain.member.dto.request.SignupRequest;
 import com.moviepick.domain.member.dto.response.MemberResponse;
@@ -47,6 +48,9 @@ class MemberWithdrawTest {
     private JwtProvider jwtProvider;
     @MockitoBean
     private RefreshTokenService refreshTokenService;
+    // [AI 추가] 기존 회원 도메인 테스트에서 무료 지급 호출 대체
+    @MockitoBean
+    private AiSignupCreditService aiSignupCreditService;
 
     @AfterEach
     void tearDown() {

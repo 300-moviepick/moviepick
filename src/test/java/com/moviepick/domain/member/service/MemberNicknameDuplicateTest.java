@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 
+import com.moviepick.domain.ai.credit.service.AiSignupCreditService;
 import com.moviepick.domain.member.dto.request.MemberUpdateRequest;
 import com.moviepick.domain.member.dto.request.SignupRequest;
 import com.moviepick.domain.member.dto.response.MemberResponse;
@@ -46,6 +47,9 @@ class MemberNicknameDuplicateTest {
     private JwtProvider jwtProvider;
     @MockitoBean
     private RefreshTokenService refreshTokenService;
+    // [AI 추가] 기존 회원 도메인 테스트에서 무료 지급 호출 대체
+    @MockitoBean
+    private AiSignupCreditService aiSignupCreditService;
 
     @AfterEach
     void tearDown() {
