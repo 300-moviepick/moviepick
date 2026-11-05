@@ -1,5 +1,6 @@
 package com.moviepick.domain.member.service;
 
+import com.moviepick.domain.ai.credit.service.AiSignupCreditService;
 import com.moviepick.domain.member.dto.request.LoginRequest;
 import com.moviepick.domain.member.dto.request.SignupRequest;
 import com.moviepick.domain.member.dto.response.LoginResponse;
@@ -10,6 +11,7 @@ import com.moviepick.domain.member.entity.MemberStatus;
 import com.moviepick.domain.member.exception.MemberErrorCode;
 import com.moviepick.domain.member.repository.MemberConstraints;
 import com.moviepick.domain.member.repository.MemberRepository;
+import com.moviepick.domain.member.service.port.SignupBenefitPort;
 import com.moviepick.global.exception.BusinessException;
 import com.moviepick.global.exception.CommonErrorCode;
 import com.moviepick.domain.member.dto.response.LoginResult;
@@ -31,6 +33,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final RefreshTokenService refreshTokenService;
+    private final SignupBenefitPort signupBenefitPort;
 
     // 회원가입
     @Transactional
@@ -69,6 +72,9 @@ public class AuthService {
         try {
             // 즉시 INSERT를 실행해 DB UNIQUE 충돌 확인
             Member savedMember = memberRepository.saveAndFlush(member);
+
+            // [변경 ③] Port를 통한 회원가입 혜택 지급
+            signupBenefitPort.grantTo(savedMember);
 
             return MemberResponse.from(savedMember);
 

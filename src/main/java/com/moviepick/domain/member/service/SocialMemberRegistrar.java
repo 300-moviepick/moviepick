@@ -1,10 +1,13 @@
 package com.moviepick.domain.member.service;
 
+import com.moviepick.domain.ai.credit.service.AiSignupCreditService;
 import com.moviepick.domain.member.entity.AuthProvider;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.repository.MemberConstraints;
 import com.moviepick.domain.member.repository.MemberRepository;
 import java.util.Optional;
+
+import com.moviepick.domain.member.service.port.SignupBenefitPort;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.stereotype.Component;
@@ -28,12 +31,20 @@ public class SocialMemberRegistrar {
 
     private final MemberRepository memberRepository;
     private final TransactionTemplate newTransaction;
+    // [변경 ②] Port 인터페이스에 의존
+    private final SignupBenefitPort signupBenefitPort;
+
 
     public SocialMemberRegistrar(
             MemberRepository memberRepository,
+            // [AI 추가 ③] 생성자 주입
+            // [변경 ③] 생성자 매개변수 변경
+            SignupBenefitPort signupBenefitPort,
             PlatformTransactionManager transactionManager
     ) {
         this.memberRepository = memberRepository;
+        // [AI 추가 ④] 지급 서비스 연결
+        this.signupBenefitPort = signupBenefitPort;
         this.newTransaction = new TransactionTemplate(transactionManager);
         this.newTransaction.setPropagationBehavior(
                 TransactionDefinition.PROPAGATION_REQUIRES_NEW
@@ -57,9 +68,23 @@ public class SocialMemberRegistrar {
             String candidate = findAvailableNickname(nickname);
 
             try {
-                return newTransaction.execute(status -> memberRepository
-                        .saveAndFlush(Member.createSocial(provider, providerId, email, candidate))
-                        .getId());
+                // [AI 변경 ⑤] 회원 생성과 지급을 동일 트랜잭션에서 처리
+                return newTransaction.execute(status -> {
+
+                    Member saved = memberRepository.saveAndFlush(
+                            Member.createSocial(
+                                    provider,
+                                    providerId,
+                                    email,
+                                    candidate
+                            )
+                    );
+
+                    // [변경 ④] 같은 트랜잭션에서 Port 호출
+                    signupBenefitPort.grantTo(saved);
+
+                    return saved.getId();
+                });
             } catch (DataIntegrityViolationException exception) {
                 // 동시 첫 로그인: 다른 요청이 먼저 만든 회원이 있으면 그 회원으로 로그인한다.
                 Optional<Long> created = findMemberId(provider, providerId);

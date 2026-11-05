@@ -7,6 +7,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.moviepick.domain.ai.credit.service.AiSignupCreditService;
 import com.moviepick.domain.member.entity.AuthProvider;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.repository.MemberRepository;
@@ -31,6 +32,7 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.transaction.annotation.Propagation;
@@ -57,6 +59,9 @@ class SocialMemberRaceTest {
     private CustomOidcUserService customOidcUserService;
     @MockitoSpyBean
     private MemberRepository memberRepository;
+    // [AI 추가] 기존 회원 도메인 테스트에서 무료 지급 호출 대체
+    @MockitoBean
+    private AiSignupCreditService aiSignupCreditService;
 
     @AfterEach
     void tearDown() {

@@ -14,7 +14,11 @@
       --default-character-set=utf8mb4 "${MYSQL_DATABASE}" < "$1"
   }
 
-  for file in /db/schema.sql /db/batch-schema.sql /db/data.sql; do
+  for file in \
+      /db/schema.sql \
+      /db/ai-credit-wallet-schema.sql \
+      /db/batch-schema.sql \
+      /db/data.sql; do
     if [ -f "$file" ]; then
       run_sql "$file"
     else
