@@ -8,6 +8,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
@@ -20,6 +21,7 @@ import org.springframework.security.web.authentication.AuthenticationFailureHand
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
@@ -105,14 +107,18 @@ public class SecurityConfig {
                         )
                 )
 
-                // CSRF 정책은 기존 설정 유지
-                // PortOne 웹훅만 CSRF 검사 제외
+                // CSRF는 쿠키 토큰 방식(XSRF-TOKEN 쿠키 + X-XSRF-TOKEN 헤더)
+                // 서버 간 호출인 PortOne 후원 웹훅만 제외 (서명으로 검증). 공개 주소 목록(PublicEndpoints)과는 별개다
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(
                                 CookieCsrfTokenRepository.withHttpOnlyFalse()
                         )
                         .csrfTokenRequestHandler(
                                 new CsrfTokenRequestAttributeHandler()
+                        )
+                        .ignoringRequestMatchers(
+                                PathPatternRequestMatcher.withDefaults()
+                                        .matcher(HttpMethod.POST, "/api/webhooks/portone/support")
                         )
                         // JWT 인증 요청마다 CSRF 토큰을 교체하지 않음
                         .sessionAuthenticationStrategy(

@@ -41,6 +41,9 @@ public final class PublicEndpoints {
 
         // 영화 목록, 상세, 랭킹, 확장 정보 조회
         add(HttpMethod.GET, "/api/movies", "/api/movies/*", "/api/movies/*/extras");
+
+        // PortOne 후원 결제 웹훅 (서명으로 검증, CSRF 예외는 SecurityConfig에서 따로 등록)
+        add(HttpMethod.POST, "/api/webhooks/portone/support");
     }
 
     public static final RequestMatcher MATCHER = new OrRequestMatcher(MATCHERS);

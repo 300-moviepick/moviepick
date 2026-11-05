@@ -29,6 +29,11 @@ class PublicEndpointsTest {
             "GET, /api/movies/1/extras, true",
             "GET, /api/movies/ranking, true",
             "POST, /api/webhooks/portone, false",
+            // PortOne 후원 웹훅은 이 경로·메서드 하나만 공개
+            "POST, /api/webhooks/portone/support, true",
+            "GET, /api/webhooks/portone/support, false",
+            "POST, /api/webhooks/portone/credit, false",
+            "POST, /api/webhooks/portone/support/extra, false",
             // 같은 주소라도 메서드가 다르면 보호
             "POST, /api/movies/1/reviews, false",
             "POST, /api/community/posts, false",
