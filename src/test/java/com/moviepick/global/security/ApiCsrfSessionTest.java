@@ -14,6 +14,7 @@ import com.moviepick.domain.member.oauth.OAuth2LoginFailureHandler;
 import com.moviepick.domain.member.oauth.CustomOAuth2UserService;
 import com.moviepick.domain.member.oauth.CustomOidcUserService;
 import com.moviepick.domain.member.dto.response.LoginResult;
+import com.moviepick.domain.member.dto.response.TokenPair;
 import com.moviepick.domain.member.oauth.OAuth2LoginSuccessHandler;
 import io.jsonwebtoken.Jwts;
 import jakarta.servlet.http.Cookie;
@@ -160,7 +161,8 @@ class ApiCsrfSessionTest {
                 new LoginResponse(1L, "user", Role.USER, ACCESS_TOKEN, "Bearer", 1800);
         given(authService.login(any()))
                 .willReturn(new LoginResult(loginResponse, "refresh-token"));
-        given(authService.refreshAccessToken(any())).willReturn(ACCESS_TOKEN);
+        given(authService.refreshAccessToken(any()))
+                .willReturn(new TokenPair(ACCESS_TOKEN, "new-refresh-token"));
 
         Cookie csrfCookie = new Cookie(CSRF_COOKIE, CSRF_TOKEN);
         String loginBody = "{\"email\":\"user@test.com\",\"password\":\"password1\"}";

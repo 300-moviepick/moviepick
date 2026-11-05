@@ -7,6 +7,7 @@ import com.moviepick.domain.member.dto.response.MemberResponse;
 import com.moviepick.global.response.ApiResponse;
 import com.moviepick.domain.member.dto.response.LoginResult;
 import com.moviepick.domain.member.dto.response.TokenRefreshResponse;
+import com.moviepick.domain.member.dto.response.TokenPair;
 import com.moviepick.domain.member.service.AuthService;
 
 import jakarta.validation.Valid;
@@ -48,14 +49,7 @@ public class AuthController {
         LoginResult result = authService.login(request);
 
         // 2. Refresh Token 쿠키 생성
-        ResponseCookie refreshTokenCookie = ResponseCookie
-                .from("refreshToken", result.refreshToken())
-                .httpOnly(true)
-                .secure(false)
-                .sameSite("Strict")
-                .path("/api/auth")
-                .maxAge(Duration.ofDays(14))
-                .build();
+        ResponseCookie refreshTokenCookie = refreshTokenCookie(result.refreshToken());
 
         // 3. Access Token은 JSON 응답으로 전달
         // Refresh Token은 HttpOnly 쿠키로 전달
@@ -102,7 +96,7 @@ public class AuthController {
                 .body(ApiResponse.ok());
     }
 
-    // Access Token 재발급 API
+    // Access Token 재발급 API (Refresh Token도 새로 발급해 쿠키를 교체)
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<TokenRefreshResponse>> refresh(
             @CookieValue(
@@ -111,17 +105,30 @@ public class AuthController {
             ) String refreshToken
     ) {
 
-        // 1. Refresh Token 검증 및 새 Access Token 발급
-        String accessToken = authService.refreshAccessToken(refreshToken);
+        // 1. Refresh Token 검증 후 새 토큰 2개 발급 (기존 Refresh Token은 폐기)
+        TokenPair tokens = authService.refreshAccessToken(refreshToken);
 
-        // 2. 응답 DTO 생성
-        TokenRefreshResponse response =
-                new TokenRefreshResponse(accessToken);
-
-        // 3. JSON 응답 반환
-        return ResponseEntity.ok(
-                ApiResponse.ok(response)
-        );
+        // 2. 새 Access Token은 JSON, 새 Refresh Token은 HttpOnly 쿠키로 전달
+        return ResponseEntity
+                .ok()
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        refreshTokenCookie(tokens.refreshToken()).toString()
+                )
+                .body(
+                        ApiResponse.ok(new TokenRefreshResponse(tokens.accessToken()))
+                );
     }
 
+    // Refresh Token 쿠키 (로그인·재발급 공통)
+    private ResponseCookie refreshTokenCookie(String refreshToken) {
+        return ResponseCookie
+                .from("refreshToken", refreshToken)
+                .httpOnly(true)
+                .secure(false)
+                .sameSite("Strict")
+                .path("/api/auth")
+                .maxAge(Duration.ofDays(14))
+                .build();
+    }
 }

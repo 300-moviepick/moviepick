@@ -4,6 +4,7 @@ import com.moviepick.domain.member.dto.request.LoginRequest;
 import com.moviepick.domain.member.dto.request.SignupRequest;
 import com.moviepick.domain.member.dto.response.LoginResponse;
 import com.moviepick.domain.member.dto.response.MemberResponse;
+import com.moviepick.domain.member.dto.response.TokenPair;
 import com.moviepick.domain.member.entity.AuthProvider;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.entity.MemberStatus;
@@ -198,9 +199,9 @@ public class AuthService {
         refreshTokenService.delete(refreshToken);
     }
 
-    // Access Token 재발급
+    // Access Token·Refresh Token 재발급 (Refresh Token은 한 번만 사용 가능)
     @Transactional
-    public String refreshAccessToken(String refreshToken) {
+    public TokenPair refreshAccessToken(String refreshToken) {
 
         // Refresh Token이 없는 경우 -> 401
         if (refreshToken == null || refreshToken.isBlank()) {
@@ -219,7 +220,9 @@ public class AuthService {
         }
 
         // Redis에 저장된 Refresh Token인지 확인
-        if (!refreshTokenService.isValid(memberId, refreshToken)) {
+        if (!refreshTokenService.consume(memberId, refreshToken)) {
+            // 서명은 맞는데 저장소에 없음 = 이미 쓴 토큰 재사용 → 탈취 의심, 전부 무효화
+            refreshTokenService.invalidateAll(memberId);
             throw new BusinessException(CommonErrorCode.UNAUTHORIZED);
         }
 
@@ -265,10 +268,13 @@ public class AuthService {
             );
         }
 
-        // 새로운 Access Token 발급
-        return jwtProvider.createAccessToken(
-                member.getId(),
-                member.getRole().name()
-        );
+        // 새 Refresh Token 발급 후 저장 (이전 토큰은 consume에서 이미 삭제됨)
+        String newRefreshToken = jwtProvider.createRefreshToken(member.getId(), currentVersion);
+        refreshTokenService.save(member.getId(), newRefreshToken);
+
+        // 새 Access Token과 새 Refresh Token 반환
+        return new TokenPair(
+                jwtProvider.createAccessToken(member.getId(), member.getRole().name()),
+                newRefreshToken);
     }
 }

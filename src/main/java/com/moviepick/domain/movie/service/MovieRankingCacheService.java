@@ -22,7 +22,7 @@ public class MovieRankingCacheService {
     @Cacheable(
             cacheNames = "movieRanking",
             key = "#version + '-' + #page + '-' + #size",
-            unless = "#result.content.isEmpty()"
+            sync = true
     )
     public PageResponse<MovieRankingResponse> getRanking(
             long version,
