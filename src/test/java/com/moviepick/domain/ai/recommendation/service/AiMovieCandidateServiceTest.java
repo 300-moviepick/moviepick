@@ -127,7 +127,8 @@ class AiMovieCandidateServiceTest {
                 100,
                 popularity,
                 null,
-                null
+                null,
+                LocalDate.of(2025, 1, 1)
         ));
 
         return movieRepository.saveAndFlush(movie);
