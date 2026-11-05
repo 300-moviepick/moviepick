@@ -99,21 +99,4 @@ public class Post extends BaseEntity {
     public void blind() {
         this.status = PostStatus.BLINDED;
     }
-
-    // 댓글 수 증가
-    public void increaseCommentCount() {
-        this.commentCount++;
-    }
-
-    // 조회수 증가
-    public void increaseViewCount() {
-        this.viewCount++;
-    }
-
-    // 댓글 수 감소
-    public void decreaseCommentCount() {
-        if (this.commentCount > 0) {
-            this.commentCount--;
-        }
-    }
 }

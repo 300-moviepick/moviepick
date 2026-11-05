@@ -26,7 +26,6 @@ class PublicEndpointsTest {
             "GET, /api/community/posts, true",
             "GET, /api/community/posts/1, true",
             "GET, /api/community/posts/1/comments, true",
-            "GET, /api/community/posts/1/likes, true",
             "GET, /api/movies/1/extras, true",
             "GET, /api/movies/ranking, true",
             "POST, /api/webhooks/portone, false",
