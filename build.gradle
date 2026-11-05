@@ -19,6 +19,12 @@ repositories {
 }
 
 dependencies {
+	// Spring AI 버전 관리
+	implementation platform('org.springframework.ai:spring-ai-bom:2.0.2')
+
+	// [추가] 로컬 Ollama 연결
+	implementation 'org.springframework.ai:spring-ai-starter-model-ollama'
+
 	// 웹·JPA·검증
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -59,7 +65,10 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
 	// 패키지 의존 규칙 검사 (BOM 관리 대상이 아니라 버전을 직접 지정)
 	testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.1'
-	testRuntimeOnly 'com.h2database:h2'
+
+	// [AI 수정] H2 2.4.240 CHECK 제약조건 버그 대응
+	testRuntimeOnly 'com.h2database:h2:2.5.252'
+
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
