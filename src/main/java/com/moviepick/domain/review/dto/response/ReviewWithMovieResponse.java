@@ -35,7 +35,7 @@ public record ReviewWithMovieResponse(
 
     private static ReviewWithMovieResponse of(Review review, int likeCount,
                                               AuthorResponse author, Boolean movieActive) {
-        boolean blinded = review.getStatus() == ReviewStatus.BLIND;
+        boolean blinded = review.getStatus() == ReviewStatus.BLINDED;
 
         return new ReviewWithMovieResponse(
                 review.getId(),

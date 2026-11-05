@@ -144,14 +144,14 @@ class ReviewReportTest {
     }
 
     @Test
-    @DisplayName("승인: 리뷰 BLIND, 평점 1회 차감, 작성자 제재 1회, 같은 리뷰 대기 신고 일괄 승인")
+    @DisplayName("승인: 리뷰 BLINDED, 평점 1회 차감, 작성자 제재 1회, 같은 리뷰 대기 신고 일괄 승인")
     void acceptReviewReport() {
         Long reportId = report(reporter, reviewId);
         Long otherReportId = report(reporter2, reviewId);
 
         adminReportService.processReport(reportId, ACCEPT);
 
-        assertThat(reviewStatus()).isEqualTo("BLIND");
+        assertThat(reviewStatus()).isEqualTo("BLINDED");
         assertRating("0.0", 0);
         assertThat(adminSanctionRepository.countByMemberId(writer.getId())).isEqualTo(1);
         assertThat(reportStatus(otherReportId)).isEqualTo(ReportStatus.ACCEPTED);
@@ -167,7 +167,7 @@ class ReviewReportTest {
 
         adminReportService.processReport(reportId, ACCEPT);
 
-        assertThat(reviewStatus()).isEqualTo("BLIND");
+        assertThat(reviewStatus()).isEqualTo("BLINDED");
         assertRating("0.0", 0);
         assertThat(adminSanctionRepository.countByMemberId(writer.getId())).isEqualTo(1);
     }

@@ -112,12 +112,12 @@ public class Review extends BaseEntity {
         this.status = ReviewStatus.DELETED;
     }
 
-    /** 수정·삭제 권한 확인: DELETED는 404, 남의 리뷰·BLIND는 403 */
+    /** 수정·삭제 권한 확인: DELETED는 404, 남의 리뷰·BLINDED는 403 */
     public void validateModifiableBy(Long memberId) {
         if (status == ReviewStatus.DELETED) {
             throw new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND);
         }
-        if (status == ReviewStatus.BLIND || !member.getId().equals(memberId)) {
+        if (status == ReviewStatus.BLINDED || !member.getId().equals(memberId)) {
             throw new BusinessException(ReviewErrorCode.NOT_REVIEW_OWNER);
         }
     }

@@ -127,7 +127,7 @@ class ReviewTransactionTest {
         Movie movie = movieRepository.findById(movieId).orElseThrow();
         assertThat(movie.getReviewCount()).isZero();
         assertThat(movie.getRatingSum()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(reviewRepository.findById(reviewId).orElseThrow().getStatus()).isEqualTo(ReviewStatus.BLIND);
+        assertThat(reviewRepository.findById(reviewId).orElseThrow().getStatus()).isEqualTo(ReviewStatus.BLINDED);
     }
 
     @Test
