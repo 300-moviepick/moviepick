@@ -9,6 +9,8 @@ public record MovieListResponse(
         Long movieId,
         String title,
         LocalDate releaseDate,
+        // 한국 극장 개봉일 (TMDB에 KR 정보가 없으면 null)
+        LocalDate releaseDateKr,
         Double voteAverage,
         String posterUrl,
         // 우리 서비스 자체 평균 평점
@@ -22,6 +24,7 @@ public record MovieListResponse(
                 movie.getId(),
                 movie.getTitle(),
                 movie.getReleaseDate(),
+                movie.getReleaseDateKr(),
                 movie.getVoteAverage(),
                 movie.getPosterUrl(),
                 // 리뷰가 0건이면 null
