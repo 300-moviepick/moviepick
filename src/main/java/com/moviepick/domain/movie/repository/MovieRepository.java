@@ -50,4 +50,9 @@ public interface MovieRepository extends JpaRepository<Movie, Long> {
             @Param("ratingDelta") BigDecimal ratingDelta,
             @Param("countDelta") int countDelta
     );
+
+    // [추가] AI 추천 후보용 영화 조회
+    Page<Movie> findByActiveTrueAndAdultFalseAndOverviewIsNotNull(
+            Pageable pageable
+    );
 }
