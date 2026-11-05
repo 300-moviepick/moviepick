@@ -5,6 +5,8 @@ import com.moviepick.domain.report.entity.CommunityReport;
 import com.moviepick.domain.report.entity.ReportStatus;
 import com.moviepick.domain.report.entity.ReportTargetType;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -15,6 +17,9 @@ import java.util.Optional;
 
 public interface CommunityReportRepository
         extends JpaRepository<CommunityReport, Long> {
+
+    // 관리자 신고 목록: 상태별 조회 (정렬은 Pageable로 전달)
+    Page<CommunityReport> findByStatus(ReportStatus status, Pageable pageable);
 
     // 기존 기능: 동일 사용자의 중복 신고 확인
     boolean existsByReporterIdAndTargetTypeAndTargetId(

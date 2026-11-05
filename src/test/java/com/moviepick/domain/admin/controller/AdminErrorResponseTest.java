@@ -1,7 +1,5 @@
 package com.moviepick.domain.admin.controller;
 
-import com.moviepick.domain.community.entity.Comment;
-import com.moviepick.domain.community.entity.Post;
 import com.moviepick.domain.community.exception.CommentErrorCode;
 import com.moviepick.domain.community.repository.CommentRepository;
 import com.moviepick.domain.community.repository.PostRepository;
@@ -26,13 +24,13 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
-// ADMIN-01: 관리자 정지 해제·댓글 삭제의 오류가 500이 아니라 404·409로 나간다
+// ADMIN-01: 관리자 정지 해제·댓글 숨김의 오류가 500이 아니라 404·409로 나간다
 class AdminErrorResponseTest {
 
     private final MemberRepository memberRepository = mock(MemberRepository.class);
     private final CommentRepository commentRepository = mock(CommentRepository.class);
 
-    // 관리자 정지 해제·댓글 삭제는 회원·댓글 서비스가 처리한다
+    // 관리자 정지 해제·댓글 숨김은 회원·댓글 서비스가 처리한다
     private final MemberService memberService =
             new MemberService(mock(RefreshTokenService.class), memberRepository);
     private final CommentService commentService = new CommentService(
@@ -67,23 +65,12 @@ class AdminErrorResponseTest {
     }
 
     @Test
-    @DisplayName("없는 댓글 관리자 삭제 → 404 COMMENT_NOT_FOUND")
-    void deleteComment_unknown() {
+    @DisplayName("없는 댓글 관리자 숨김 → 404 COMMENT_NOT_FOUND")
+    void blindComment_unknown() {
         given(commentRepository.findById(99L)).willReturn(Optional.empty());
 
-        assertError(() -> commentService.deleteByAdmin(99L),
+        assertError(() -> commentService.blindComment(99L),
                 CommentErrorCode.COMMENT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
-
-    @Test
-    @DisplayName("이미 삭제된 댓글 관리자 삭제 → 404 COMMENT_NOT_FOUND")
-    void deleteComment_alreadyDeleted() {
-        Member writer = Member.createLocal("w@test.com", "encoded", "w");
-        Comment comment = Comment.create(Post.create(writer, "title", "content"), writer, "댓글");
-        comment.delete();
-        given(commentRepository.findById(1L)).willReturn(Optional.of(comment));
-
-        assertError(() -> commentService.deleteByAdmin(1L),
-                CommentErrorCode.COMMENT_NOT_FOUND, HttpStatus.NOT_FOUND);
-    }
+    // 이미 삭제·숨김된 댓글의 관리자 숨김은 오류 없이 변화 없음 → CommentBlindTest에서 DB 값으로 검증
 }

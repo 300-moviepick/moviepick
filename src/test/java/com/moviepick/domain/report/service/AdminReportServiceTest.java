@@ -14,6 +14,8 @@ import com.moviepick.domain.report.entity.ReportTargetType;
 import com.moviepick.domain.community.exception.PostErrorCode;
 import com.moviepick.domain.report.repository.CommunityReportRepository;
 import com.moviepick.domain.community.repository.PostRepository;
+import com.moviepick.domain.community.service.CommentLikeService;
+import com.moviepick.domain.community.service.CommentService;
 import com.moviepick.domain.community.service.PostLikeService;
 import com.moviepick.domain.community.service.PostService;
 import com.moviepick.domain.member.entity.Member;
@@ -37,7 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
 /** 벌크 UPDATE와 refresh가 실제 커밋 기준으로 동작하는지 보려고 테스트 트랜잭션을 끄고 H2로 확인한다. */
 @DataJpaTest
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import({JpaAuditingConfig.class, AdminReportService.class, PostService.class, PostLikeService.class})
+@Import({JpaAuditingConfig.class, AdminReportService.class, PostService.class, PostLikeService.class,
+        CommentService.class, CommentLikeService.class})
 class AdminReportServiceTest {
 
     private static final AdminReportProcessRequest ACCEPT =
@@ -170,11 +173,37 @@ class AdminReportServiceTest {
         Post post = postRepository.save(Post.create(writer, "title", "a".repeat(150)));
         saveReport(saveMember("reporter"), post);
 
-        AdminReportResponse response = adminReportService.getReports(0, 20).getContent().get(0);
+        AdminReportResponse response = adminReportService.getReports(null, 0, 20).getContent().get(0);
 
         assertThat(response.postTitle()).isEqualTo("title");
         assertThat(response.postContentPreview()).hasSize(100);
         assertThat(response.authorNickname()).isEqualTo("writer");
+    }
+
+    @Test
+    @DisplayName("신고 목록 status 필터: PENDING·ACCEPTED·REJECTED는 해당 상태만, 생략하면 전체")
+    void getReportsByStatus() {
+        Post post = postRepository.save(Post.create(saveMember("writer"), "title", "content"));
+        Long pending = saveReport(saveMember("reporter1"), post, ReportStatus.PENDING).getId();
+        Long accepted = saveReport(saveMember("reporter2"), post, ReportStatus.ACCEPTED).getId();
+        Long rejected = saveReport(saveMember("reporter3"), post, ReportStatus.REJECTED).getId();
+
+        assertThat(reportIds(ReportStatus.PENDING)).containsExactly(pending);
+        assertThat(reportIds(ReportStatus.ACCEPTED)).containsExactly(accepted);
+        assertThat(reportIds(ReportStatus.REJECTED)).containsExactly(rejected);
+        assertThat(reportIds(null)).containsExactlyInAnyOrder(pending, accepted, rejected);
+    }
+
+    @Test
+    @DisplayName("신고 목록은 최신순(createdAt 내림차순)이다")
+    void getReportsLatestFirst() {
+        Post post = postRepository.save(Post.create(saveMember("writer"), "title", "content"));
+        Long first = saveReport(saveMember("reporter1"), post).getId();
+        Long second = saveReport(saveMember("reporter2"), post).getId();
+        Long third = saveReport(saveMember("reporter3"), post).getId();
+
+        assertThat(reportIds(null)).containsExactly(third, second, first);
+        assertThat(reportIds(ReportStatus.PENDING)).containsExactly(third, second, first);
     }
 
     @Test
@@ -204,5 +233,19 @@ class AdminReportServiceTest {
     private CommunityReport saveReport(Member reporter, Post post) {
         return communityReportRepository.save(
                 CommunityReport.create(reporter, ReportTargetType.POST, post.getId(), "SPAM", null));
+    }
+
+    // 목록 필터 확인용: 처리 상태를 정해서 저장
+    private CommunityReport saveReport(Member reporter, Post post, ReportStatus status) {
+        CommunityReport report =
+                CommunityReport.create(reporter, ReportTargetType.POST, post.getId(), "SPAM", null);
+        ReflectionTestUtils.setField(report, "status", status);
+        return communityReportRepository.save(report);
+    }
+
+    private java.util.List<Long> reportIds(ReportStatus status) {
+        return adminReportService.getReports(status, 0, 20).getContent().stream()
+                .map(AdminReportResponse::reportId)
+                .toList();
     }
 }

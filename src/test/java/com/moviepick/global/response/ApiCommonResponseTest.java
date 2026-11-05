@@ -128,9 +128,10 @@ class ApiCommonResponseTest {
         Post post = postRepository.save(Post.create(user, "title", "content"));
         Comment comment = commentRepository.save(Comment.create(post, user, "comment"));
 
-        mvc.perform(delete("/api/admin/comments/" + comment.getId())
+        // 관리자 댓글 삭제 API가 숨김(PATCH)으로 바뀌어, 본문 없는 DELETE인 작성자 댓글 삭제로 확인한다
+        mvc.perform(delete("/api/community/comments/" + comment.getId())
                         .with(csrf())
-                        .header("Authorization", adminToken))
+                        .header("Authorization", userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.code").value(200));
