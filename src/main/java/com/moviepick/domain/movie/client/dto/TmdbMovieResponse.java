@@ -47,7 +47,11 @@ public record TmdbMovieResponse(
         CreditsResponse credits,
 
         @JsonProperty("watch/providers")
-        WatchProvidersResponse watchProviders
+        WatchProvidersResponse watchProviders,
+
+        // 국가별 개봉일 (한국 개봉일 추출용)
+        @JsonProperty("release_dates")
+        ReleaseDatesResponse releaseDates
 ) {
 
     // 기존 15개 인자 생성 코드와의 호환성 유지
@@ -73,7 +77,7 @@ public record TmdbMovieResponse(
                 overview, releaseDate, runtime, status,
                 adult, voteAverage, voteCount, popularity,
                 posterPath, backdropPath, genres,
-                null, null, null
+                null, null, null, null
         );
     }
 
@@ -152,6 +156,34 @@ public record TmdbMovieResponse(
             List<ProviderResponse> buy,
             List<ProviderResponse> free,
             List<ProviderResponse> ads
+    ) {
+    }
+
+    // 국가별 개봉일
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ReleaseDatesResponse(
+            List<CountryReleaseDatesResponse> results
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record CountryReleaseDatesResponse(
+            @JsonProperty("iso_3166_1")
+            String country,
+
+            @JsonProperty("release_dates")
+            List<ReleaseDateResponse> releaseDates
+    ) {
+    }
+
+    // type: 1 시사회, 2 제한 상영, 3 극장 개봉, 4 디지털, 5 DVD 등, 6 TV
+    // releaseDate 예: "2026-11-01T00:00:00.000Z"
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ReleaseDateResponse(
+            @JsonProperty("release_date")
+            String releaseDate,
+
+            Integer type
     ) {
     }
 

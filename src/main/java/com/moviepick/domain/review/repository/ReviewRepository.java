@@ -24,6 +24,12 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query("select r from Review r where r.id = :id")
     Optional<Review> findByIdForUpdate(@Param("id") Long id);
 
+    // 리뷰 ID로 연결된 영화 ID 조회 (락 획득 전 사용)
+    @Query("select r.movie.id from Review r where r.id = :reviewId")
+    Optional<Long> findMovieIdByReviewId(
+            @Param("reviewId") Long reviewId
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Review r where r.member.id = :memberId and r.movie.id = :movieId")
     Optional<Review> findByMemberIdAndMovieIdForUpdate(@Param("memberId") Long memberId,

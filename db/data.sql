@@ -6,4 +6,4 @@ SET NAMES utf8mb4;
 
 -- 관리자 계정 (비밀번호는 저장소에 남기지 않고 팀에 따로 전달한다. AWS에서는 다른 비밀번호를 쓴다)
 INSERT INTO members (provider, provider_id, email, password_hash, nickname, role, status, created_at, updated_at)
-VALUES ('LOCAL', NULL, 'admin@admin.com', '$2a$10$u36VZIObbx4blFHcjFtxj.th/sTALlERBzyIZwNjANNkS62rIUOui/.', '관리자', 'ADMIN', 'ACTIVE', NOW(6), NOW(6));
+VALUES ('LOCAL', NULL, 'admin@admin.com', '$2a$10$NUpNDbLPUqaBTrkixyyi8.tnkMp/MQVJGiuwRW68O2k9PGOh4/QG.', '관리자', 'ADMIN', 'ACTIVE', NOW(6), NOW(6));

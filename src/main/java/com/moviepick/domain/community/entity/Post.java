@@ -22,7 +22,7 @@ import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
 @Table(
-        name = "post",
+        name = "posts",
         // 게시글 최신순 목록
         indexes = @Index(name = "idx_post_status_created_at", columnList = "status, created_at"))
 @Getter
@@ -98,22 +98,5 @@ public class Post extends BaseEntity {
     // 관리자: 신고 승인 또는 수동 조치로 게시글 숨김
     public void blind() {
         this.status = PostStatus.BLINDED;
-    }
-
-    // 댓글 수 증가
-    public void increaseCommentCount() {
-        this.commentCount++;
-    }
-
-    // 조회수 증가
-    public void increaseViewCount() {
-        this.viewCount++;
-    }
-
-    // 댓글 수 감소
-    public void decreaseCommentCount() {
-        if (this.commentCount > 0) {
-            this.commentCount--;
-        }
     }
 }

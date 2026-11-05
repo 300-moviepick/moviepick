@@ -25,12 +25,13 @@ public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
     Page<Wishlist> findByMemberIdAndMovieActiveTrue(Long memberId, Pageable pageable);
 
     // 개봉 알림 대상: 해당 날짜에 개봉하는 활성 영화를 찜한 회원 (제외 상태 회원 빼고)
+    // 개봉일은 한국 개봉일(releaseDateKr)을 쓰고, 없으면 TMDB 기본 개봉일(releaseDate)을 쓴다
     @Query("""
             select w from Wishlist w
             join fetch w.member m
             join fetch w.movie mv
             where mv.active = true
-              and mv.releaseDate = :releaseDate
+              and coalesce(mv.releaseDateKr, mv.releaseDate) = :releaseDate
               and m.status <> :excludedStatus
             """)
     List<Wishlist> findReleaseTargets(

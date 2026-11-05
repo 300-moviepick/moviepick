@@ -7,6 +7,7 @@ import com.moviepick.domain.report.dto.request.AdminReportProcessRequest;
 import com.moviepick.domain.report.dto.response.AdminReportResponse;
 import com.moviepick.domain.report.repository.AdminSanctionRepository;
 import com.moviepick.domain.report.repository.CommunityReportRepository;
+import com.moviepick.domain.community.service.CommentService;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.repository.MemberRepository;
 import com.moviepick.domain.member.service.MemberService;
@@ -68,6 +69,9 @@ class ReviewReportTest {
     private AdminSanctionRepository adminSanctionRepository;
     @MockitoBean
     private RefreshTokenService refreshTokenService;
+    // 댓글 신고 승인용 의존성. 이 테스트는 댓글을 다루지 않는다
+    @MockitoBean
+    private CommentService commentService;
 
     private Member writer;
     private Member reporter;
@@ -144,14 +148,14 @@ class ReviewReportTest {
     }
 
     @Test
-    @DisplayName("승인: 리뷰 BLIND, 평점 1회 차감, 작성자 제재 1회, 같은 리뷰 대기 신고 일괄 승인")
+    @DisplayName("승인: 리뷰 BLINDED, 평점 1회 차감, 작성자 제재 1회, 같은 리뷰 대기 신고 일괄 승인")
     void acceptReviewReport() {
         Long reportId = report(reporter, reviewId);
         Long otherReportId = report(reporter2, reviewId);
 
         adminReportService.processReport(reportId, ACCEPT);
 
-        assertThat(reviewStatus()).isEqualTo("BLIND");
+        assertThat(reviewStatus()).isEqualTo("BLINDED");
         assertRating("0.0", 0);
         assertThat(adminSanctionRepository.countByMemberId(writer.getId())).isEqualTo(1);
         assertThat(reportStatus(otherReportId)).isEqualTo(ReportStatus.ACCEPTED);
@@ -167,7 +171,7 @@ class ReviewReportTest {
 
         adminReportService.processReport(reportId, ACCEPT);
 
-        assertThat(reviewStatus()).isEqualTo("BLIND");
+        assertThat(reviewStatus()).isEqualTo("BLINDED");
         assertRating("0.0", 0);
         assertThat(adminSanctionRepository.countByMemberId(writer.getId())).isEqualTo(1);
     }
@@ -203,7 +207,7 @@ class ReviewReportTest {
     void adminListShowsReviewTarget() {
         Long reportId = report(reporter, reviewId);
 
-        AdminReportResponse item = adminReportService.getReports(0, 20).getContent().stream()
+        AdminReportResponse item = adminReportService.getReports(null, 0, 20).getContent().stream()
                 .filter(r -> r.reportId().equals(reportId))
                 .findFirst()
                 .orElseThrow();

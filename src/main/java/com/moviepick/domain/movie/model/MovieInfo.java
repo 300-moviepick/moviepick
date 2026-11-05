@@ -15,6 +15,7 @@ public record MovieInfo(
         Integer voteCount,
         Double popularity,
         String posterPath,
-        String backdropPath
+        String backdropPath,
+        LocalDate releaseDateKr
 ) {
 }

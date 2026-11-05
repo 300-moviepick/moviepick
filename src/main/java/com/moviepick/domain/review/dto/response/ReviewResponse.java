@@ -20,7 +20,7 @@ public record ReviewResponse(
         boolean rewritten
 ) {
     public static ReviewResponse of(Review review, int likeCount, boolean likedByMe) {
-        boolean blinded = review.getStatus() == ReviewStatus.BLIND;
+        boolean blinded = review.getStatus() == ReviewStatus.BLINDED;
 
         return new ReviewResponse(
                 review.getId(),

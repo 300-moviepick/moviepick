@@ -52,6 +52,10 @@ public class Movie extends BaseEntity {
     @Column(name = "release_date")
     private LocalDate releaseDate;
 
+    // 한국 극장 개봉일 (TMDB release_dates의 KR, 없으면 null)
+    @Column(name = "release_date_kr")
+    private LocalDate releaseDateKr;
+
     // 상영 시간 (분)
     @Column(name = "runtime_minutes")
     private Integer runtimeMinutes;
@@ -117,6 +121,7 @@ public class Movie extends BaseEntity {
         this.originalLanguage = info.originalLanguage();
         this.overview = info.overview();
         this.releaseDate = info.releaseDate();
+        this.releaseDateKr = info.releaseDateKr();
         this.runtimeMinutes = info.runtimeMinutes();
         this.status = info.status();
         this.adult = info.adult();

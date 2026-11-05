@@ -10,6 +10,7 @@ import com.moviepick.domain.report.entity.ReportStatus;
 import com.moviepick.domain.report.entity.ReportTargetType;
 import com.moviepick.domain.report.repository.CommunityReportRepository;
 import com.moviepick.domain.community.repository.PostRepository;
+import com.moviepick.domain.community.service.CommentService;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.repository.MemberRepository;
 import com.moviepick.domain.review.service.ReviewService;
@@ -44,6 +45,9 @@ class AdminReportReprocessTest {
     // 리뷰 신고 승인용 의존성. 이 테스트는 리뷰를 다루지 않는다
     @MockitoBean
     private ReviewService reviewService;
+    // 댓글 신고 승인용 의존성. 이 테스트는 댓글을 다루지 않는다
+    @MockitoBean
+    private CommentService commentService;
     @Autowired
     private MemberRepository memberRepository;
     @Autowired
