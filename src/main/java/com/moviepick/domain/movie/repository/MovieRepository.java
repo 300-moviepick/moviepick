@@ -13,7 +13,7 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.util.Optional;
 
-public interface MovieRepository extends JpaRepository<Movie, Long> {
+public interface MovieRepository extends JpaRepository<Movie, Long>, MovieReleaseRepository {
 
     // TMDB 영화 ID로 조회 (중복 확인 및 동기화)
     Optional<Movie> findByTmdbId(Long tmdbId);

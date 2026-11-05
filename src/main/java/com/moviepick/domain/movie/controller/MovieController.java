@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/movies")
 public class MovieController {
 
+    private static final String SORT_RELEASE_DATE = "releaseDate";
+
     private final MovieQueryService movieQueryService;
     private final MovieReviewReader movieReviewReader;
     private final MovieExtraService movieExtraService;
@@ -32,7 +34,8 @@ public class MovieController {
     public ResponseEntity<ApiResponse<PageResponse<MovieListResponse>>> getMovies(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String sort
     ) {
         if (page < 0 || size < 1 || size > 100) {
             throw new BusinessException(
@@ -40,6 +43,21 @@ public class MovieController {
             );
         }
 
+        // 최근 개봉작 순 (sort=releaseDate). 정렬은 Repository 쿼리가 맡는다
+        if (sort != null && !sort.isBlank()) {
+            if (!SORT_RELEASE_DATE.equalsIgnoreCase(sort)) {
+                throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+            }
+
+            Page<MovieListResponse> movies = movieQueryService
+                    .getRecentlyReleasedMovies(keyword, PageRequest.of(page, size));
+
+            return ResponseEntity.ok(
+                    ApiResponse.ok(PageResponse.from(movies))
+            );
+        }
+
+        // sort가 없으면 기존 동작 (id 내림차순)
         PageRequest pageable = PageRequest.of(
                 page,
                 size,
