@@ -12,6 +12,7 @@ import com.moviepick.domain.report.entity.ReportTargetType;
 import com.moviepick.domain.community.repository.CommentRepository;
 import com.moviepick.domain.report.repository.CommunityReportRepository;
 import com.moviepick.domain.community.repository.PostRepository;
+import com.moviepick.domain.community.service.CommentService;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.entity.MemberStatus;
 import com.moviepick.domain.member.repository.MemberRepository;
@@ -26,6 +27,7 @@ import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
@@ -44,13 +46,22 @@ public class AdminReportService {
     private final CommentRepository commentRepository;
     private final ReviewRepository reviewRepository;
     private final ReviewService reviewService;
+    private final CommentService commentService;
     private final EntityManager entityManager;
 
-    // 관리자: 신고 목록 조회
-    public Page<AdminReportResponse> getReports(int page, int size) {
-        return communityReportRepository
-                .findAll(PageRequest.of(page, size))
-                .map(this::createReportResponse);
+    // 관리자 신고 목록 정렬: 최신순 (같은 시각이면 id 내림차순)
+    private static final Sort REPORT_LIST_SORT =
+            Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
+
+    // 관리자: 신고 목록 조회 (status가 null이면 전체)
+    public Page<AdminReportResponse> getReports(ReportStatus status, int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size, REPORT_LIST_SORT);
+
+        Page<CommunityReport> reports = status == null
+                ? communityReportRepository.findAll(pageable)
+                : communityReportRepository.findByStatus(status, pageable);
+
+        return reports.map(this::createReportResponse);
     }
 
     // 관리자: 신고 승인 또는 반려
@@ -137,20 +148,6 @@ public class AdminReportService {
             }
         }
 
-        // 10-1. 댓글 신고 승인 시 숨김 처리 (B1)
-        // 작성자가 이미 삭제했거나 이미 숨긴 댓글은 상태 유지
-        Long blindedCommentPostId = null;
-
-        if (report.getTargetType() == ReportTargetType.COMMENT) {
-            Comment comment = commentRepository.findById(report.getTargetId())
-                    .orElseThrow(() ->
-                            new BusinessException(CommonErrorCode.NOT_FOUND));
-
-            if (comment.blind()) {
-                blindedCommentPostId = comment.getPost().getId();
-            }
-        }
-
         // 11. 신고 승인
         int updated = communityReportRepository.updateStatusIfPending(
                 reportId,
@@ -205,10 +202,12 @@ public class AdminReportService {
             adminSanctionRepository.save(sanction);
         }
 
-        // 14. 숨긴 댓글은 삭제와 같이 게시글 댓글 수에서 뺀다
-        // 원자적 감소 쿼리는 실행 전에 변경을 반영하고 영속성 컨텍스트를 비우므로 맨 마지막에 실행한다
-        if (blindedCommentPostId != null) {
-            postRepository.decreaseCommentCount(blindedCommentPostId);
+        // 14. 댓글 신고 승인 시 숨김 + 게시글 댓글 수 감소 (관리자 PATCH …/blind와 같은 코드 경로, B1)
+        // 공개 댓글만 숨기고 줄이며, 작성자가 이미 삭제했거나 이미 숨긴 댓글은 그대로 둔다.
+        // 댓글 수 감소 쿼리가 실행 전에 변경을 반영하고 영속성 컨텍스트를 비우므로 회원 정지·제재 저장 뒤에 실행한다
+        // (댓글 존재 여부는 3단계 findReportedMemberId에서 이미 확인)
+        if (report.getTargetType() == ReportTargetType.COMMENT) {
+            commentService.blindComment(report.getTargetId());
         }
 
         // 14-1. 리뷰 신고 승인 시 숨김 + 평점 차감 (관리자 PATCH …/blind와 같은 코드 경로, B3)

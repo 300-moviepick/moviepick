@@ -18,6 +18,7 @@ import com.moviepick.domain.community.repository.CommentRepository;
 import com.moviepick.domain.report.repository.CommunityReportRepository;
 import com.moviepick.domain.community.repository.PostRepository;
 import com.moviepick.domain.member.entity.Member;
+import com.moviepick.domain.member.entity.MemberStatus;
 import com.moviepick.domain.member.repository.MemberRepository;
 import com.moviepick.domain.review.service.ReviewService;
 import com.moviepick.global.config.JpaAuditingConfig;
@@ -140,16 +141,68 @@ class CommentBlindTest {
         assertThat(commentCount()).isEqualTo(1);
     }
 
+    // 아래 관리자 숨김 테스트는 테스트 트랜잭션 없이(NOT_SUPPORTED) 서비스 호출이 커밋된 뒤,
+    // statusOf·commentCount 등으로 새로 조회한 DB 값을 검증한다 (메모리의 엔티티가 아님)
+
     @Test
-    @DisplayName("관리자는 숨긴 댓글을 삭제할 수 있고, 댓글 수는 다시 줄지 않는다")
-    void adminDeletesBlindedComment() {
+    @DisplayName("신고로 숨긴 댓글을 관리자가 다시 숨겨도 BLINDED 유지, 댓글 수는 다시 줄지 않는다")
+    void adminBlindsReportBlindedComment() {
         acceptReport(blindTargetId);
         assertThat(commentCount()).isEqualTo(1);   // 숨길 때 이미 1 줄었다
 
-        commentService.deleteByAdmin(blindTargetId);
+        commentService.blindComment(blindTargetId);
+
+        assertThat(statusOf(blindTargetId)).isEqualTo("BLINDED");
+        assertThat(commentCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("관리자 숨김: 공개 댓글은 BLINDED가 되고 글의 댓글 수가 1 준다")
+    void adminBlindsVisibleComment() {
+        assertThat(commentCount()).isEqualTo(2);
+
+        commentService.blindComment(blindTargetId);
+
+        assertThat(statusOf(blindTargetId)).isEqualTo("BLINDED");
+        assertThat(statusOf(otherCommentId)).isEqualTo("VISIBLE");
+        assertThat(commentCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("관리자 숨김: 같은 댓글을 두 번 숨겨도 댓글 수는 한 번만 준다")
+    void adminBlindTwiceDecreasesOnce() {
+        commentService.blindComment(blindTargetId);
+        commentService.blindComment(blindTargetId);
+
+        assertThat(statusOf(blindTargetId)).isEqualTo("BLINDED");
+        assertThat(commentCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("관리자 숨김: 작성자가 이미 삭제한 댓글은 DELETED 유지, 댓글 수 변화 없음")
+    void adminBlindDeletedCommentNoChange() {
+        commentService.deleteCommentById(writer.getId(), blindTargetId);
+        assertThat(commentCount()).isEqualTo(1);
+
+        commentService.blindComment(blindTargetId);
 
         assertThat(statusOf(blindTargetId)).isEqualTo("DELETED");
         assertThat(commentCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("관리자 숨김은 신고 상태와 회원 제재를 바꾸지 않는다 (신고 PENDING 유지, 제재 0건, 작성자 ACTIVE)")
+    void adminBlindLeavesReportsAndSanctions() {
+        Long reportId = saveReport(blindTargetId);
+
+        commentService.blindComment(blindTargetId);
+
+        assertThat(statusOf(blindTargetId)).isEqualTo("BLINDED");
+        assertThat(communityReportRepository.findById(reportId).orElseThrow().getStatus())
+                .isEqualTo(ReportStatus.PENDING);
+        assertThat(adminSanctionRepository.countByMemberId(writer.getId())).isZero();
+        assertThat(memberRepository.findById(writer.getId()).orElseThrow().getStatus())
+                .isEqualTo(MemberStatus.ACTIVE);
     }
 
     @Test

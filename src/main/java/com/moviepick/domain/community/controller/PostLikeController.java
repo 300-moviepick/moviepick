@@ -8,7 +8,6 @@ import com.moviepick.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,15 +41,5 @@ public class PostLikeController {
         PostLikeResponse response = postLikeService.removeLike(memberId, postId);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
-    }
-
-    // 게시글 좋아요 수 조회
-    @GetMapping
-    public ResponseEntity<ApiResponse<Long>> getLikeCount(
-            @PathVariable Long postId
-    ) {
-        long count = postLikeService.getLikeCount(postId);
-
-        return ResponseEntity.ok(ApiResponse.ok(count));
     }
 }

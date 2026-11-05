@@ -39,9 +39,6 @@ public final class PublicEndpoints {
                 "/api/community/posts/*",
                 "/api/community/posts/*/comments");
 
-        // 게시글 좋아요 수 조회
-        add(HttpMethod.GET, "/api/community/posts/*/likes");
-
         // 영화 목록, 상세, 랭킹, 확장 정보 조회
         add(HttpMethod.GET, "/api/movies", "/api/movies/*", "/api/movies/*/extras");
     }
