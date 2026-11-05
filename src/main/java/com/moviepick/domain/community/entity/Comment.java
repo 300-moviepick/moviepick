@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Table(
-        name = "comment",
+        name = "comments",
         // 게시글별 댓글 목록 (오래된 순)
         indexes = @Index(name = "idx_comment_post_id_status_created_at", columnList = "post_id, status, created_at"))
 @Getter

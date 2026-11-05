@@ -22,7 +22,7 @@ import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
 @Table(
-        name = "post",
+        name = "posts",
         // 게시글 최신순 목록
         indexes = @Index(name = "idx_post_status_created_at", columnList = "status, created_at"))
 @Getter

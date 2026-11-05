@@ -24,7 +24,7 @@ CREATE TABLE `admin_sanctions` (
   CONSTRAINT `FKil4rvajkyqual4v2bcprxh73` FOREIGN KEY (`report_id`) REFERENCES `community_reports` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE `comment` (
+CREATE TABLE `comments` (
   `created_at` datetime(6) NOT NULL,
   `id` bigint NOT NULL AUTO_INCREMENT,
   `member_id` bigint NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE `comment` (
   KEY `FKs1slvnkuemjsq2kj4h3vhx7i1` (`post_id`),
   KEY `idx_comment_post_id_status_created_at` (`post_id`,`status`,`created_at`),
   CONSTRAINT `FKocwtsgphsvfiqmipwu0qqj84l` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`),
-  CONSTRAINT `FKs1slvnkuemjsq2kj4h3vhx7i1` FOREIGN KEY (`post_id`) REFERENCES `post` (`id`)
+  CONSTRAINT `FKs1slvnkuemjsq2kj4h3vhx7i1` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `comment_likes` (
@@ -49,7 +49,7 @@ CREATE TABLE `comment_likes` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_comment_like_member` (`comment_id`,`member_id`),
   KEY `FKq6gltbxc24mdpub8fpe4ms8wf` (`member_id`),
-  CONSTRAINT `FKd0epu3dcjc57pwe7lt5jgfqsi` FOREIGN KEY (`comment_id`) REFERENCES `comment` (`id`),
+  CONSTRAINT `FKd0epu3dcjc57pwe7lt5jgfqsi` FOREIGN KEY (`comment_id`) REFERENCES `comments` (`id`),
   CONSTRAINT `FKq6gltbxc24mdpub8fpe4ms8wf` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -146,7 +146,7 @@ CREATE TABLE `payments` (
   CONSTRAINT `FKtvbq19graff4nnoqpngbe762` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE `post` (
+CREATE TABLE `posts` (
   `comment_count` int NOT NULL,
   `view_count` int NOT NULL,
   `created_at` datetime(6) NOT NULL,
@@ -171,7 +171,7 @@ CREATE TABLE `post_likes` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_post_like_member` (`post_id`,`member_id`),
   KEY `FKsr9uiilpnflc32a04yyx7bun` (`member_id`),
-  CONSTRAINT `FKmxmoc9p5ndijnsqtvsjcuoxm3` FOREIGN KEY (`post_id`) REFERENCES `post` (`id`),
+  CONSTRAINT `FKmxmoc9p5ndijnsqtvsjcuoxm3` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`),
   CONSTRAINT `FKsr9uiilpnflc32a04yyx7bun` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -198,7 +198,7 @@ CREATE TABLE `reviews` (
   `updated_at` datetime(6) NOT NULL,
   `rewritten_at` datetime(6) DEFAULT NULL,
   `content` varchar(1000) NOT NULL,
-  `status` enum('BLIND','DELETED','VISIBLE') NOT NULL,
+  `status` enum('BLINDED','DELETED','VISIBLE') NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_reviews_member_id_movie_id` (`member_id`,`movie_id`),
   KEY `idx_reviews_movie_id_status_created_at` (`movie_id`,`status`,`created_at`),

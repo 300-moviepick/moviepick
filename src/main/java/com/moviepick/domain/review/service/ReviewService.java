@@ -49,7 +49,7 @@ public class ReviewService implements MovieReviewReader {
 
     // 목록에 나오는 리뷰 상태: 숨긴 리뷰도 자리를 유지한다 (내용·평점은 응답에서 null)
     private static final List<ReviewStatus> LISTED_STATUSES =
-            List.of(ReviewStatus.VISIBLE, ReviewStatus.BLIND);
+            List.of(ReviewStatus.VISIBLE, ReviewStatus.BLINDED);
 
     private final ReviewRepository reviewRepository;
     private final ReviewLikeRepository reviewLikeRepository;
@@ -95,7 +95,7 @@ public class ReviewService implements MovieReviewReader {
     ) {
         switch (existing.getStatus()) {
             case VISIBLE -> throw new BusinessException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
-            case BLIND -> throw new BusinessException(ReviewErrorCode.REVIEW_BLINDED);
+            case BLINDED -> throw new BusinessException(ReviewErrorCode.REVIEW_BLINDED);
             default -> {
                 // 이전 좋아요 기록을 지운 뒤 덮어쓴다.
                 // 다시 쓴 리뷰는 좋아요 0부터 시작한다.
@@ -290,7 +290,7 @@ public class ReviewService implements MovieReviewReader {
 
     /**
      * 관리자 파트(PATCH /api/admin/reviews/{reviewId}/blind)에서 호출.
-     * VISIBLE → BLIND + 평점 집계 차감을 한 트랜잭션으로 처리.
+     * VISIBLE → BLINDED + 평점 집계 차감을 한 트랜잭션으로 처리.
      * 영화 락을 먼저 획득한 후 조건부 UPDATE를 실행한다.
      */
     @Transactional
@@ -309,7 +309,7 @@ public class ReviewService implements MovieReviewReader {
         int changed = reviewRepository.changeStatus(
                 reviewId,
                 ReviewStatus.VISIBLE,
-                ReviewStatus.BLIND,
+                ReviewStatus.BLINDED,
                 LocalDateTime.now()
         );
 
