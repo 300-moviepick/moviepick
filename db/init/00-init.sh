@@ -17,6 +17,8 @@
   for file in \
       /db/schema.sql \
       /db/ai-credit-wallet-schema.sql \
+      /db/ai-credit-transactions-schema.sql \
+      /db/ai-recommendation-feedback-schema.sql \
       /db/batch-schema.sql \
       /db/data.sql; do
     if [ -f "$file" ]; then

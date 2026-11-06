@@ -5,28 +5,29 @@ import com.moviepick.domain.ai.recommendation.repository.AiMovieEmbeddingReposit
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.LocalDate;
+import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AiMovieEmbeddingSyncServiceTest {
 
-    private static final String MODEL = "embeddinggemma:300m";
-    private static final String CONTENT =
-            "title: 인터스텔라 | text: 줄거리: 우주 여행\n장르: SF, 드라마";
+    private static final Long MOVIE_ID = 1L;
+    private static final String MODEL_NAME = "text-embedding-3-small";
+    private static final int DIMENSIONS = 768;
+
+    private static final String MOVIE_TEXT =
+            "title: 테스트 영화 | text: 줄거리: 우주를 탐험하는 이야기\n장르: SF";
 
     @Mock
     private AiMovieCandidateService candidateService;
@@ -45,28 +46,31 @@ class AiMovieEmbeddingSyncServiceTest {
                 candidateService,
                 embeddingService,
                 embeddingRepository,
-                MODEL
+                MODEL_NAME,
+                DIMENSIONS
         );
     }
 
     @Test
-    void 처음_수집하는_영화는_임베딩을_생성하여_저장한다() {
+    void 처음_수집하는_영화는_임베딩을_생성하여_저장한다()
+            throws Exception {
 
-        AiMovieCandidate movie = movie();
+        AiMovieCandidate movie = createMovie();
+        float[] vector = createVector();
 
-        given(candidateService.findCandidatesForRanking())
-                .willReturn(List.of(movie));
+        when(movie.title()).thenReturn("테스트 영화");
 
-        given(embeddingService.buildMovieText(movie))
-                .willReturn(CONTENT);
+        when(embeddingService.buildMovieText(movie))
+                .thenReturn(MOVIE_TEXT);
 
-        given(embeddingRepository.findByMovieId(60L))
-                .willReturn(Optional.empty());
+        when(embeddingRepository.findByMovieId(MOVIE_ID))
+                .thenReturn(Optional.empty());
 
-        given(embeddingService.embedMovie(movie))
-                .willReturn(new float[]{0.1f, 0.2f, 0.3f});
+        when(embeddingService.embedMovie(movie))
+                .thenReturn(vector);
 
-        var result = syncService.sync(10);
+        AiMovieEmbeddingSyncService.SyncResult result =
+                syncService.syncMovies(List.of(movie));
 
         assertThat(result.total()).isEqualTo(1);
         assertThat(result.created()).isEqualTo(1);
@@ -74,129 +78,189 @@ class AiMovieEmbeddingSyncServiceTest {
         assertThat(result.skipped()).isZero();
         assertThat(result.failed()).isZero();
 
-        ArgumentCaptor<String> hashCaptor =
-                ArgumentCaptor.forClass(String.class);
+        verify(embeddingService).embedMovie(movie);
 
         verify(embeddingRepository).upsert(
-                eq(60L),
-                eq(MODEL),
-                hashCaptor.capture(),
-                any(float[].class)
+                eq(MOVIE_ID),
+                eq(MODEL_NAME),
+                eq(sha256(MOVIE_TEXT)),
+                same(vector)
         );
-
-        assertThat(hashCaptor.getValue())
-                .matches("[0-9a-f]{64}");
     }
 
     @Test
     void 영화_내용과_모델이_같으면_재임베딩을_생략한다()
             throws Exception {
 
-        AiMovieCandidate movie = movie();
+        AiMovieCandidate movie = createMovie();
 
-        given(candidateService.findCandidatesForRanking())
-                .willReturn(List.of(movie));
+        AiMovieEmbeddingRepository.StoredEmbedding existing =
+                mock(AiMovieEmbeddingRepository.StoredEmbedding.class);
 
-        given(embeddingService.buildMovieText(movie))
-                .willReturn(CONTENT);
+        when(movie.title()).thenReturn("테스트 영화");
 
-        var stored = new AiMovieEmbeddingRepository.StoredEmbedding(
-                60L,
-                MODEL,
-                sha256(CONTENT),
-                new float[]{0.1f, 0.2f, 0.3f}
-        );
+        when(embeddingService.buildMovieText(movie))
+                .thenReturn(MOVIE_TEXT);
 
-        given(embeddingRepository.findByMovieId(60L))
-                .willReturn(Optional.of(stored));
+        when(embeddingRepository.findByMovieId(MOVIE_ID))
+                .thenReturn(Optional.of(existing));
 
-        var result = syncService.sync(10);
+        when(existing.modelName())
+                .thenReturn(MODEL_NAME);
 
-        assertThat(result.skipped()).isEqualTo(1);
+        when(existing.contentHash())
+                .thenReturn(sha256(MOVIE_TEXT));
+
+        AiMovieEmbeddingSyncService.SyncResult result =
+                syncService.syncMovies(List.of(movie));
+
+        assertThat(result.total()).isEqualTo(1);
         assertThat(result.created()).isZero();
         assertThat(result.updated()).isZero();
+        assertThat(result.skipped()).isEqualTo(1);
+        assertThat(result.failed()).isZero();
 
         verify(embeddingService, never())
                 .embedMovie(any());
 
         verify(embeddingRepository, never())
-                .upsert(any(), any(), any(), any());
-    }
-
-    @Test
-    void 영화_내용이_변경되면_임베딩을_갱신한다() {
-
-        AiMovieCandidate movie = movie();
-
-        given(candidateService.findCandidatesForRanking())
-                .willReturn(List.of(movie));
-
-        given(embeddingService.buildMovieText(movie))
-                .willReturn(CONTENT);
-
-        var stored = new AiMovieEmbeddingRepository.StoredEmbedding(
-                60L,
-                MODEL,
-                "a".repeat(64),
-                new float[]{0.1f, 0.2f, 0.3f}
-        );
-
-        given(embeddingRepository.findByMovieId(60L))
-                .willReturn(Optional.of(stored));
-
-        given(embeddingService.embedMovie(movie))
-                .willReturn(new float[]{0.4f, 0.5f, 0.6f});
-
-        var result = syncService.sync(10);
-
-        assertThat(result.updated()).isEqualTo(1);
-        assertThat(result.failed()).isZero();
-
-        verify(embeddingRepository).upsert(
-                eq(60L),
-                eq(MODEL),
-                anyString(),
-                any(float[].class)
-        );
-    }
-
-    @Test
-    void 임베딩_생성에_실패하면_실패_건수를_기록한다() {
-
-        AiMovieCandidate movie = movie();
-
-        given(candidateService.findCandidatesForRanking())
-                .willReturn(List.of(movie));
-
-        given(embeddingService.buildMovieText(movie))
-                .willReturn(CONTENT);
-
-        given(embeddingRepository.findByMovieId(60L))
-                .willReturn(Optional.empty());
-
-        given(embeddingService.embedMovie(movie))
-                .willThrow(
-                        new IllegalStateException("Ollama 호출 실패")
+                .upsert(
+                        anyLong(),
+                        anyString(),
+                        anyString(),
+                        any(float[].class)
                 );
+    }
 
-        var result = syncService.sync(10);
+    @Test
+    void 영화_내용이_변경되면_임베딩을_갱신한다()
+            throws Exception {
+
+        AiMovieCandidate movie = createMovie();
+        float[] vector = createVector();
+
+        AiMovieEmbeddingRepository.StoredEmbedding existing =
+                mock(AiMovieEmbeddingRepository.StoredEmbedding.class);
+
+        when(movie.title()).thenReturn("테스트 영화");
+
+        when(embeddingService.buildMovieText(movie))
+                .thenReturn(MOVIE_TEXT);
+
+        when(embeddingRepository.findByMovieId(MOVIE_ID))
+                .thenReturn(Optional.of(existing));
+
+        when(existing.modelName())
+                .thenReturn(MODEL_NAME);
+
+        when(existing.contentHash())
+                .thenReturn(sha256("변경 전 영화 줄거리"));
+
+        when(embeddingService.embedMovie(movie))
+                .thenReturn(vector);
+
+        AiMovieEmbeddingSyncService.SyncResult result =
+                syncService.syncMovies(List.of(movie));
 
         assertThat(result.total()).isEqualTo(1);
-        assertThat(result.failed()).isEqualTo(1);
         assertThat(result.created()).isZero();
+        assertThat(result.updated()).isEqualTo(1);
+        assertThat(result.skipped()).isZero();
+        assertThat(result.failed()).isZero();
 
-        verify(embeddingRepository, never())
-                .upsert(any(), any(), any(), any());
+        verify(embeddingService).embedMovie(movie);
+
+        verify(embeddingRepository).upsert(
+                eq(MOVIE_ID),
+                eq(MODEL_NAME),
+                eq(sha256(MOVIE_TEXT)),
+                same(vector)
+        );
     }
 
     @Test
-    void 잘못된_수집_개수는_거부한다() {
+    void 임베딩_모델이_변경되면_영화를_재임베딩한다()
+            throws Exception {
 
-        assertThatThrownBy(() -> syncService.sync(0))
-                .isInstanceOf(IllegalArgumentException.class);
+        AiMovieCandidate movie = createMovie();
+        float[] vector = createVector();
 
-        assertThatThrownBy(() -> syncService.sync(101))
-                .isInstanceOf(IllegalArgumentException.class);
+        AiMovieEmbeddingRepository.StoredEmbedding existing =
+                mock(AiMovieEmbeddingRepository.StoredEmbedding.class);
+
+        when(movie.title()).thenReturn("테스트 영화");
+
+        when(embeddingService.buildMovieText(movie))
+                .thenReturn(MOVIE_TEXT);
+
+        when(embeddingRepository.findByMovieId(MOVIE_ID))
+                .thenReturn(Optional.of(existing));
+
+        when(existing.modelName())
+                .thenReturn("embeddinggemma:300m");
+
+        when(embeddingService.embedMovie(movie))
+                .thenReturn(vector);
+
+        AiMovieEmbeddingSyncService.SyncResult result =
+                syncService.syncMovies(List.of(movie));
+
+        assertThat(result.total()).isEqualTo(1);
+        assertThat(result.created()).isZero();
+        assertThat(result.updated()).isEqualTo(1);
+        assertThat(result.skipped()).isZero();
+        assertThat(result.failed()).isZero();
+
+        verify(embeddingService).embedMovie(movie);
+
+        verify(embeddingRepository).upsert(
+                eq(MOVIE_ID),
+                eq(MODEL_NAME),
+                eq(sha256(MOVIE_TEXT)),
+                same(vector)
+        );
+    }
+
+    @Test
+    void 임베딩_차원이_다르면_저장하지_않는다() {
+
+        AiMovieCandidate movie = createMovie();
+
+        when(embeddingService.buildMovieText(movie))
+                .thenReturn(MOVIE_TEXT);
+
+        when(embeddingRepository.findByMovieId(MOVIE_ID))
+                .thenReturn(Optional.empty());
+
+        // 의도적으로 3차원 반환
+        when(embeddingService.embedMovie(movie))
+                .thenReturn(new float[]{0.1f, 0.2f, 0.3f});
+
+        AiMovieEmbeddingSyncService.SyncResult result =
+                syncService.syncMovies(List.of(movie));
+
+        assertThat(result.total()).isEqualTo(1);
+        assertThat(result.created()).isZero();
+        assertThat(result.updated()).isZero();
+        assertThat(result.skipped()).isZero();
+        assertThat(result.failed()).isEqualTo(1);
+
+        verify(embeddingRepository, never())
+                .upsert(
+                        anyLong(),
+                        anyString(),
+                        anyString(),
+                        any(float[].class)
+                );
+    }
+
+    @Test
+    void 영화_목록이_null이면_예외가_발생한다() {
+
+        assertThatThrownBy(() ->
+                syncService.syncMovies(null)
+        ).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("영화 목록은 null일 수 없습니다.");
 
         verifyNoInteractions(
                 candidateService,
@@ -205,24 +269,37 @@ class AiMovieEmbeddingSyncServiceTest {
         );
     }
 
-    private AiMovieCandidate movie() {
-        return new AiMovieCandidate(
-                60L,
-                157336L,
-                "인터스텔라",
-                "우주 여행",
-                LocalDate.of(2014, 11, 6),
-                List.of("SF", "드라마"),
-                8.6,
-                100.0,
-                null
-        );
+    // 모든 테스트에서 공통으로 사용하는 영화 ID
+    private AiMovieCandidate createMovie() {
+
+        AiMovieCandidate movie = mock(AiMovieCandidate.class);
+
+        when(movie.movieId()).thenReturn(MOVIE_ID);
+
+        return movie;
     }
 
-    private String sha256(String text) throws Exception {
-        byte[] hash = MessageDigest
-                .getInstance("SHA-256")
-                .digest(text.getBytes(StandardCharsets.UTF_8));
+    // 정상 임베딩은 768차원
+    private float[] createVector() {
+
+        float[] vector = new float[DIMENSIONS];
+
+        vector[0] = 0.1f;
+        vector[1] = 0.2f;
+        vector[2] = 0.3f;
+
+        return vector;
+    }
+
+    private String sha256(String text)
+            throws NoSuchAlgorithmException {
+
+        MessageDigest digest =
+                MessageDigest.getInstance("SHA-256");
+
+        byte[] hash = digest.digest(
+                text.getBytes(StandardCharsets.UTF_8)
+        );
 
         return HexFormat.of().formatHex(hash);
     }

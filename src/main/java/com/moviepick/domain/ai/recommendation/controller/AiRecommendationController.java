@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/ai/recommendations")
 @ConditionalOnProperty(
         name = "spring.ai.model.chat",
-        havingValue = "ollama"
+        havingValue = "openai"
 )
 public class AiRecommendationController {
 

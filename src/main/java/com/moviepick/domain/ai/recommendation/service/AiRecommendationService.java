@@ -11,6 +11,7 @@ import com.moviepick.domain.ai.recommendation.dto.AiRecommendedMovie;
 import com.moviepick.global.exception.BusinessException;
 import com.moviepick.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.ToDoubleFunction;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiRecommendationService {
@@ -43,7 +45,6 @@ public class AiRecommendationService {
         List<AiMovieCandidate> candidatePool =
                 candidateService.findCandidatesForRanking();
 
-        // 후보가 없으면 크레딧 차감 없이 종료
         if (candidatePool == null || candidatePool.isEmpty()) {
             throw new BusinessException(
                     CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
@@ -62,7 +63,6 @@ public class AiRecommendationService {
                         )
                         .toList();
 
-        // DISLIKE 제외 후 후보가 없어도 차감하지 않음
         if (availableCandidates.isEmpty()) {
             throw new BusinessException(
                     CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
@@ -89,7 +89,7 @@ public class AiRecommendationService {
                         personalizationScore
                 );
 
-        // ⑦ 기존 랭킹 서비스로 최종 후보 선정
+        // ⑦ 최종 추천 후보 선정
         List<AiMovieCandidate> rankedCandidates =
                 rankingService.rank(
                         request.prompt(),
@@ -106,14 +106,14 @@ public class AiRecommendationService {
 
         String requestKey = request.requestKey().toString();
 
-        // ⑧ AI 크레딧 차감
+        // ⑧ AI 크레딧 사용
         AiCreditSpendService.SpendResult spendResult =
                 spendService.spendOne(
                         memberId,
                         requestKey
                 );
 
-        // ⑨ 동일한 진행 요청이면 AI를 다시 호출하지 않음
+        // ⑨ 동일 요청 중복 처리
         if (spendResult.duplicate()) {
             throw new BusinessException(
                     CommonErrorCode.AI_RECOMMENDATION_IN_PROGRESS
@@ -124,28 +124,70 @@ public class AiRecommendationService {
 
         try {
 
-            // ⑩ LLM으로 영화별 추천 이유 생성
+            // ⑩ LLM 추천 이유 생성
+            log.info(
+                    "AI 추천 이유 생성 시작. memberId={}, requestKey={}, movies={}",
+                    memberId,
+                    requestKey,
+                    rankedCandidates.size()
+            );
+
             List<AiMovieReason> reasons =
                     reasonGenerator.generate(
                             request.prompt(),
                             rankedCandidates
                     );
 
-            // ⑪ 영화 정보와 추천 이유 결합
+            log.info(
+                    "AI 추천 이유 생성 완료. memberId={}, requestKey={}",
+                    memberId,
+                    requestKey
+            );
+
+            // ⑪ 추천 결과 검증 및 응답 변환
             recommendedMovies = combineResults(
                     rankedCandidates,
                     reasons
             );
 
+            log.info(
+                    "AI 추천 결과 검증 완료. memberId={}, requestKey={}",
+                    memberId,
+                    requestKey
+            );
+
         } catch (RuntimeException aiFailure) {
 
-            // ⑫ AI 처리 실패 시 크레딧 복구
+            // [추가] 원본 예외와 스택 트레이스 출력
+            log.error(
+                    "AI 추천 처리 실패. memberId={}, requestKey={}",
+                    memberId,
+                    requestKey,
+                    aiFailure
+            );
+
+            // ⑫ 실패 시 크레딧 복구
             try {
                 restoreService.restoreOne(
                         memberId,
                         requestKey
                 );
+
+                log.info(
+                        "AI 크레딧 복구 처리 완료. memberId={}, requestKey={}",
+                        memberId,
+                        requestKey
+                );
+
             } catch (RuntimeException restoreFailure) {
+
+                log.error(
+                        "AI 크레딧 복구 실패. memberId={}, requestKey={}",
+                        memberId,
+                        requestKey,
+                        restoreFailure
+                );
+
                 aiFailure.addSuppressed(restoreFailure);
             }
 
@@ -154,20 +196,27 @@ public class AiRecommendationService {
             );
         }
 
-        // ⑬ 성공 처리 (COMPLETE 실패는 자동복구하지 않음)
+        // ⑬ 정상 처리 확정
         completeService.completeOne(
                 memberId,
                 requestKey
         );
 
-        // ⑭ 최종 응답 반환
+        log.info(
+                "AI 추천 성공. memberId={}, requestKey={}, movies={}",
+                memberId,
+                requestKey,
+                recommendedMovies.size()
+        );
+
+        // ⑭ 응답 반환
         return new AiRecommendResponse(
                 request.requestKey(),
                 recommendedMovies
         );
     }
 
-    // LLM이 반환한 영화 ID와 실제 후보 영화 ID 검증
+    // LLM 결과의 영화 ID와 추천 후보 검증
     private List<AiRecommendedMovie> combineResults(
             List<AiMovieCandidate> candidates,
             List<AiMovieReason> reasons

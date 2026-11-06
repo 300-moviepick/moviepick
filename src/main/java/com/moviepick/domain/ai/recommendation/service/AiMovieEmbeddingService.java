@@ -13,33 +13,35 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @ConditionalOnProperty(
         name = "spring.ai.model.embedding",
-        havingValue = "ollama"
+        havingValue = "openai"
 )
 public class AiMovieEmbeddingService {
 
     private final EmbeddingModel embeddingModel;
 
-    // 사용자 요청을 벡터로 변환
+    // 사용자 추천 요청을 OpenAI 벡터로 변환
     public float[] embedRequest(String prompt) {
+
         if (prompt == null || prompt.isBlank()) {
             throw new IllegalArgumentException(
                     "추천 요청 문장은 필수입니다."
             );
         }
 
-        String text = "task: search result | query: "
-                + prompt.trim();
+        return embeddingModel.embed(prompt.trim());
+    }
+
+    // 영화 정보를 OpenAI 벡터로 변환
+    public float[] embedMovie(AiMovieCandidate movie) {
+
+        String text = buildMovieText(movie);
 
         return embeddingModel.embed(text);
     }
 
-    // 영화 정보를 벡터로 변환
-    public float[] embedMovie(AiMovieCandidate movie) {
-        return embeddingModel.embed(buildMovieText(movie));
-    }
-
-    // [추가] 임베딩과 해시 계산에 동일한 원본 텍스트 사용
+    // 영화 임베딩과 해시 계산에 동일한 텍스트 사용
     public String buildMovieText(AiMovieCandidate movie) {
+
         if (movie == null
                 || movie.title() == null
                 || movie.title().isBlank()) {

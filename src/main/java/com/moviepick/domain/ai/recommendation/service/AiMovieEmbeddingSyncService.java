@@ -18,7 +18,7 @@ import java.util.Optional;
 @Service
 @ConditionalOnProperty(
         name = "spring.ai.model.embedding",
-        havingValue = "ollama"
+        havingValue = "openai"
 )
 public class AiMovieEmbeddingSyncService {
 
@@ -27,21 +27,26 @@ public class AiMovieEmbeddingSyncService {
     private final AiMovieCandidateService candidateService;
     private final AiMovieEmbeddingService embeddingService;
     private final AiMovieEmbeddingRepository embeddingRepository;
+
     private final String modelName;
+    private final int expectedDimensions;
 
     public AiMovieEmbeddingSyncService(
             AiMovieCandidateService candidateService,
             AiMovieEmbeddingService embeddingService,
             AiMovieEmbeddingRepository embeddingRepository,
-            @Value("${spring.ai.ollama.embedding.model}") String modelName
+            @Value("${spring.ai.openai.embedding.model}") String modelName,
+            @Value("${spring.ai.openai.embedding.dimensions:768}")
+            int expectedDimensions
     ) {
         this.candidateService = candidateService;
         this.embeddingService = embeddingService;
         this.embeddingRepository = embeddingRepository;
         this.modelName = modelName;
+        this.expectedDimensions = expectedDimensions;
     }
 
-    // 기존 10편 시범 수집 기능 유지
+    // 기존 시범 수집 기능 유지
     public SyncResult sync(int limit) {
 
         if (limit < 1 || limit > MAX_PILOT_LIMIT) {
@@ -58,7 +63,7 @@ public class AiMovieEmbeddingSyncService {
         return syncMovies(pool.subList(0, targetCount));
     }
 
-    // [추가] 외부에서 전달받은 영화 목록 임베딩
+    // 전달받은 영화 목록 임베딩 동기화
     public SyncResult syncMovies(List<AiMovieCandidate> movies) {
 
         if (movies == null) {
@@ -82,7 +87,7 @@ public class AiMovieEmbeddingSyncService {
                 String content =
                         embeddingService.buildMovieText(movie);
 
-                // ② SHA-256 해시
+                // ② 영화 내용 SHA-256 해시
                 String contentHash = sha256(content);
 
                 // ③ 기존 임베딩 조회
@@ -90,7 +95,7 @@ public class AiMovieEmbeddingSyncService {
                         existing =
                         embeddingRepository.findByMovieId(movieId);
 
-                // ④ 동일 모델 + 동일 내용이면 생략
+                // ④ 모델과 내용이 모두 동일하면 생략
                 if (existing.isPresent()
                         && modelName.equals(
                         existing.get().modelName()
@@ -102,19 +107,35 @@ public class AiMovieEmbeddingSyncService {
                     skipped++;
 
                     log.info(
-                            "영화 임베딩 생략. movieId={}, title={}",
+                            "영화 임베딩 생략. movieId={}, title={}, model={}",
                             movieId,
-                            movie.title()
+                            movie.title(),
+                            modelName
                     );
 
                     continue;
                 }
 
-                // ⑤ 신규·변경 영화만 Ollama 호출
+                // ⑤ OpenAI 임베딩 생성
                 float[] embedding =
                         embeddingService.embedMovie(movie);
 
-                // ⑥ MySQL UPSERT
+                // ⑥ 임베딩 차원 검증
+                if (embedding == null
+                        || embedding.length != expectedDimensions) {
+                    throw new IllegalStateException(
+                            "영화 임베딩 차원 불일치. movieId="
+                                    + movieId
+                                    + ", expected="
+                                    + expectedDimensions
+                                    + ", actual="
+                                    + (embedding == null
+                                    ? "null"
+                                    : embedding.length)
+                    );
+                }
+
+                // ⑦ MySQL UPSERT
                 embeddingRepository.upsert(
                         movieId,
                         modelName,
@@ -129,13 +150,15 @@ public class AiMovieEmbeddingSyncService {
                 }
 
                 log.info(
-                        "영화 임베딩 저장 성공. movieId={}, title={}, dimensions={}",
+                        "영화 임베딩 저장 성공. movieId={}, title={}, model={}, dimensions={}",
                         movieId,
                         movie.title(),
+                        modelName,
                         embedding.length
                 );
 
             } catch (RuntimeException e) {
+
                 failed++;
 
                 log.error(

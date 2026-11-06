@@ -16,8 +16,8 @@ import java.util.Map;
 @Slf4j
 @Service
 @ConditionalOnProperty(
-        name = "spring.ai.model.embedding",
-        havingValue = "ollama"
+        name = "spring.ai.model.chat",
+        havingValue = "openai"
 )
 public class AiMovieSemanticSimilarityService {
 
@@ -30,7 +30,7 @@ public class AiMovieSemanticSimilarityService {
             AiMovieEmbeddingService embeddingService,
             AiMovieEmbeddingRepository embeddingRepository,
             AiCosineSimilarityService cosineSimilarityService,
-            @Value("${spring.ai.ollama.embedding.model}") String modelName
+            @Value("${spring.ai.openai.embedding.model}") String modelName
     ) {
         this.embeddingService = embeddingService;
         this.embeddingRepository = embeddingRepository;

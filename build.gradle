@@ -21,10 +21,9 @@ repositories {
 dependencies {
 	// Spring AI 버전 관리
 	implementation platform('org.springframework.ai:spring-ai-bom:2.0.2')
-
-	// [추가] 로컬 Ollama 연결
+	// 신규 OpenAI GPT
+	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 	implementation 'org.springframework.ai:spring-ai-starter-model-ollama'
-
 	// 웹·JPA·검증
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'

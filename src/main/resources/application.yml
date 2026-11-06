@@ -1,22 +1,26 @@
 spring:
+  # Spring AI
   ai:
     model:
       chat: ${AI_CHAT_PROVIDER:none}
-      embedding: ollama
+      embedding: ${AI_EMBEDDING_PROVIDER:openai}
       image: none
       moderation: none
-
-    ollama:
-      base-url: http://localhost:11434
+    # OpenAI - GPT 추천 이유 생성 + 영화 임베딩
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      # GPT 추천 이유 생성
       chat:
-        model: qwen3:4b
+        model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
+      # 영화 및 사용자 요청 임베딩
       embedding:
-        model: embeddinggemma:300m
+        model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+        dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:768}
   profiles:
     active: local
   # 프로젝트 맨 위의 .env를 설정으로 읽는다 (없으면 무시). docker compose와 같은 파일
   config:
-    import: optional:file:.env[.properties]
+    import: "file:./.env[.properties]"
   batch:
     job:
       enabled: false

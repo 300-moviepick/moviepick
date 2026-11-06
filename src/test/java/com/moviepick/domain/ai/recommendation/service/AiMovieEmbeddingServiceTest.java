@@ -1,18 +1,13 @@
 package com.moviepick.domain.ai.recommendation.service;
 
-import com.moviepick.domain.ai.recommendation.dto.AiMovieCandidate;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.embedding.EmbeddingModel;
 
-import java.time.LocalDate;
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -21,76 +16,49 @@ class AiMovieEmbeddingServiceTest {
     @Mock
     private EmbeddingModel embeddingModel;
 
-    @InjectMocks
     private AiMovieEmbeddingService embeddingService;
 
-    @Test
-    void 사용자_요청을_벡터로_변환한다() {
-
-        String text =
-                "task: search result | query: 우주 탐험 영화 추천";
-
-        float[] expected = {0.1f, 0.2f, 0.3f};
-
-        given(embeddingModel.embed(text))
-                .willReturn(expected);
-
-        float[] result = embeddingService.embedRequest(
-                "우주 탐험 영화 추천"
-        );
-
-        assertThat(result).containsExactly(expected);
-
-        verify(embeddingModel).embed(text);
+    @BeforeEach
+    void setUp() {
+        embeddingService =
+                new AiMovieEmbeddingService(embeddingModel);
     }
 
     @Test
-    void 영화_정보를_벡터로_변환한다() {
+    void 사용자_요청을_그대로_임베딩한다() {
 
-        AiMovieCandidate movie = new AiMovieCandidate(
-                60L,
-                157336L,
-                "인터스텔라",
-                "우주 여행과 가족 이야기",
-                LocalDate.of(2014, 11, 6),
-                List.of("SF", "드라마"),
-                8.6,
-                120.0,
-                null
-        );
+        String prompt = "감동적인 SF 영화를 추천해줘";
 
-        String expectedText =
-                "title: 인터스텔라"
-                        + " | text: 줄거리: 우주 여행과 가족 이야기"
-                        + "\n장르: SF, 드라마";
+        float[] expected = new float[768];
 
-        float[] expected = {0.4f, 0.5f, 0.6f};
+        when(embeddingModel.embed(prompt))
+                .thenReturn(expected);
 
-        given(embeddingModel.embed(expectedText))
-                .willReturn(expected);
+        float[] actual =
+                embeddingService.embedRequest("  " + prompt + "  ");
 
-        float[] result = embeddingService.embedMovie(movie);
+        assertThat(actual).isSameAs(expected);
 
-        assertThat(result).containsExactly(expected);
-
-        verify(embeddingModel).embed(expectedText);
+        verify(embeddingModel).embed(prompt);
+        verifyNoMoreInteractions(embeddingModel);
     }
 
     @Test
-    void 빈_요청은_거부한다() {
+    void 빈_추천_요청은_거부한다() {
 
         assertThatThrownBy(() ->
-                embeddingService.embedRequest(" ")
-        ).isInstanceOf(IllegalArgumentException.class);
+                embeddingService.embedRequest("   ")
+        ).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("추천 요청 문장은 필수입니다.");
 
         verifyNoInteractions(embeddingModel);
     }
 
     @Test
-    void 영화_정보가_없으면_거부한다() {
+    void null_추천_요청은_거부한다() {
 
         assertThatThrownBy(() ->
-                embeddingService.embedMovie(null)
+                embeddingService.embedRequest(null)
         ).isInstanceOf(IllegalArgumentException.class);
 
         verifyNoInteractions(embeddingModel);

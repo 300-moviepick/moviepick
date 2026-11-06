@@ -13,8 +13,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(
-        name = "spring.ai.model.embedding",
-        havingValue = "ollama"
+        name = "spring.ai.model.chat",
+        havingValue = "openai"
 )
 public class AiMovieEmbeddingBulkSyncService {
 
