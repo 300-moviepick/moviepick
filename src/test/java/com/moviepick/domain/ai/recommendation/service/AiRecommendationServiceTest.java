@@ -10,6 +10,7 @@ import com.moviepick.domain.ai.recommendation.dto.AiRecommendRequest;
 import com.moviepick.domain.ai.recommendation.dto.AiRecommendedMovie;
 import com.moviepick.global.exception.BusinessException;
 import com.moviepick.global.exception.CommonErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -22,7 +23,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.ToDoubleFunction;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -48,9 +51,15 @@ class AiRecommendationServiceTest {
     private AiMovieRankingService rankingService =
             new AiMovieRankingService();
 
-    // [추가] 회원 취향 분석 서비스
     @Mock
     private AiMemberGenrePreferenceService preferenceService;
+
+    @Mock
+    private AiFeedbackRankingService feedbackRankingService;
+
+    // [추가] 하이브리드 랭킹 Mock
+    @Mock
+    private AiHybridRankingScoreService hybridRankingScoreService;
 
     @Mock
     private AiMovieReasonGenerator reasonGenerator;
@@ -67,6 +76,16 @@ class AiRecommendationServiceTest {
     @InjectMocks
     private AiRecommendationService recommendationService;
 
+    // [추가] 기존 개인화 점수 함수를 그대로 반환
+    @BeforeEach
+    void setUpHybridRanking() {
+        lenient().when(hybridRankingScoreService.compose(
+                anyString(),
+                anyList(),
+                any(ToDoubleFunction.class)
+        )).thenAnswer(invocation -> invocation.getArgument(2));
+    }
+
     @Test
     void 추천에_성공하면_크레딧_사용을_확정한다() {
 
@@ -74,6 +93,8 @@ class AiRecommendationServiceTest {
 
         given(candidateService.findCandidatesForRanking())
                 .willReturn(candidates);
+
+        givenEmptyProfile(MEMBER_ID);
 
         given(spendService.spendOne(
                 MEMBER_ID, REQUEST_KEY.toString()
@@ -88,7 +109,8 @@ class AiRecommendationServiceTest {
                 ));
 
         var response = recommendationService.recommend(
-                MEMBER_ID, request()
+                MEMBER_ID,
+                request()
         );
 
         assertThat(response.requestKey()).isEqualTo(REQUEST_KEY);
@@ -97,6 +119,7 @@ class AiRecommendationServiceTest {
 
         InOrder order = inOrder(
                 candidateService,
+                feedbackRankingService,
                 preferenceService,
                 rankingService,
                 spendService,
@@ -107,7 +130,9 @@ class AiRecommendationServiceTest {
         order.verify(candidateService)
                 .findCandidatesForRanking();
 
-        // [변경] 회원 취향 조회 후 개인화 랭킹 실행
+        order.verify(feedbackRankingService)
+                .loadProfile(MEMBER_ID);
+
         order.verify(preferenceService)
                 .getGenreWeights(MEMBER_ID);
 
@@ -151,6 +176,8 @@ class AiRecommendationServiceTest {
         given(candidateService.findCandidatesForRanking())
                 .willReturn(pool);
 
+        givenEmptyProfile(MEMBER_ID);
+
         given(spendService.spendOne(
                 MEMBER_ID, REQUEST_KEY.toString()
         )).willReturn(successfulSpend());
@@ -165,7 +192,8 @@ class AiRecommendationServiceTest {
         ));
 
         var response = recommendationService.recommend(
-                MEMBER_ID, request()
+                MEMBER_ID,
+                request()
         );
 
         assertThat(response.movies())
@@ -205,6 +233,7 @@ class AiRecommendationServiceTest {
         );
 
         verifyNoInteractions(
+                feedbackRankingService,
                 preferenceService,
                 rankingService,
                 spendService,
@@ -219,6 +248,8 @@ class AiRecommendationServiceTest {
 
         given(candidateService.findCandidatesForRanking())
                 .willReturn(candidates());
+
+        givenEmptyProfile(MEMBER_ID);
 
         given(spendService.spendOne(
                 MEMBER_ID, REQUEST_KEY.toString()
@@ -248,14 +279,14 @@ class AiRecommendationServiceTest {
         given(candidateService.findCandidatesForRanking())
                 .willReturn(candidates());
 
+        givenEmptyProfile(MEMBER_ID);
+
         given(spendService.spendOne(
                 MEMBER_ID, REQUEST_KEY.toString()
         )).willReturn(successfulSpend());
 
         given(reasonGenerator.generate(PROMPT, candidates()))
-                .willThrow(
-                        new IllegalStateException("Ollama 호출 실패")
-                );
+                .willThrow(new IllegalStateException("Ollama 호출 실패"));
 
         assertThatThrownBy(() ->
                 recommendationService.recommend(MEMBER_ID, request())
@@ -278,16 +309,15 @@ class AiRecommendationServiceTest {
         given(candidateService.findCandidatesForRanking())
                 .willReturn(candidates());
 
+        givenEmptyProfile(MEMBER_ID);
+
         given(spendService.spendOne(
                 MEMBER_ID, REQUEST_KEY.toString()
         )).willReturn(successfulSpend());
 
         given(reasonGenerator.generate(PROMPT, candidates()))
                 .willReturn(List.of(
-                        new AiMovieReason(
-                                999L,
-                                "존재하지 않는 영화"
-                        )
+                        new AiMovieReason(999L, "존재하지 않는 영화")
                 ));
 
         assertThatThrownBy(() ->
@@ -306,23 +336,20 @@ class AiRecommendationServiceTest {
         given(candidateService.findCandidatesForRanking())
                 .willReturn(candidates());
 
+        givenEmptyProfile(MEMBER_ID);
+
         given(spendService.spendOne(
                 MEMBER_ID, REQUEST_KEY.toString()
         )).willReturn(successfulSpend());
 
         given(reasonGenerator.generate(PROMPT, candidates()))
                 .willReturn(List.of(
-                        new AiMovieReason(
-                                1L,
-                                "감동적인 SF 영화입니다."
-                        )
+                        new AiMovieReason(1L, "감동적인 SF 영화입니다.")
                 ));
 
         given(completeService.completeOne(
                 MEMBER_ID, REQUEST_KEY.toString()
-        )).willThrow(
-                new IllegalStateException("DB 확정 실패")
-        );
+        )).willThrow(new IllegalStateException("DB 확정 실패"));
 
         assertThatThrownBy(() ->
                 recommendationService.recommend(MEMBER_ID, request())
@@ -333,7 +360,7 @@ class AiRecommendationServiceTest {
     }
 
     @Test
-    void 같은_요청이라도_회원의_장르_취향에_따라_순위가_달라진다() {
+    void 같은_요청이라도_회원_취향에_따라_순위가_달라진다() {
 
         String prompt = "영화 추천해 줘";
 
@@ -351,35 +378,25 @@ class AiRecommendationServiceTest {
         given(candidateService.findCandidatesForRanking())
                 .willReturn(pool);
 
-        // 회원 2: SF 선호
+        givenEmptyProfile(2L);
+        givenEmptyProfile(3L);
+
         given(preferenceService.getGenreWeights(2L))
-                .willReturn(Map.of(
-                        "sf", 8.0,
-                        "로맨스", -8.0
-                ));
+                .willReturn(Map.of("sf", 8.0, "로맨스", -8.0));
 
-        // 회원 3: 로맨스 선호
         given(preferenceService.getGenreWeights(3L))
-                .willReturn(Map.of(
-                        "sf", -8.0,
-                        "로맨스", 8.0
-                ));
+                .willReturn(Map.of("sf", -8.0, "로맨스", 8.0));
 
-        // 취향 계산 방식은 별도 단위 테스트에서 검증
         given(preferenceService.scoreGenrePreference(
                 any(AiMovieCandidate.class),
                 anyMap()
         )).willAnswer(invocation -> {
 
             AiMovieCandidate movie = invocation.getArgument(0);
-
-            Map<String, Double> weights =
-                    invocation.getArgument(1);
+            Map<String, Double> weights = invocation.getArgument(1);
 
             return movie.genres().stream()
-                    .map(genre ->
-                            genre.toLowerCase(Locale.ROOT)
-                    )
+                    .map(genre -> genre.toLowerCase(Locale.ROOT))
                     .mapToDouble(genre ->
                             weights.getOrDefault(genre, 0.0)
                     )
@@ -414,7 +431,6 @@ class AiRecommendationServiceTest {
         var memberA = recommendationService.recommend(2L, request);
         var memberB = recommendationService.recommend(3L, request);
 
-        // 같은 요청이지만 회원별 첫 번째 추천 영화가 다름
         assertThat(memberA.movies().get(0).movieId())
                 .isEqualTo(2L);
 
@@ -426,13 +442,159 @@ class AiRecommendationServiceTest {
 
         verify(completeService)
                 .completeOne(3L, REQUEST_KEY.toString());
+    }
 
-        verifyNoInteractions(restoreService);
+    @Test
+    void DISLIKE_영화는_AI_추천_후보에서_제외한다() {
+
+        List<AiMovieCandidate> pool = List.of(
+                movie(
+                        1L, "비선호 영화", "우주 탐험",
+                        List.of("SF"), 900.0
+                ),
+                movie(
+                        2L, "우주 영화", "우주를 탐험하는 이야기",
+                        List.of("SF"), 100.0
+                )
+        );
+
+        given(candidateService.findCandidatesForRanking())
+                .willReturn(pool);
+
+        given(feedbackRankingService.loadProfile(MEMBER_ID))
+                .willReturn(new AiFeedbackRankingService.FeedbackProfile(
+                        Set.of(1L),
+                        Set.of()
+                ));
+
+        given(spendService.spendOne(
+                MEMBER_ID, REQUEST_KEY.toString()
+        )).willReturn(successfulSpend());
+
+        given(reasonGenerator.generate(eq(PROMPT), anyList()))
+                .willReturn(List.of(
+                        new AiMovieReason(2L, "SF 모험 영화입니다.")
+                ));
+
+        var response = recommendationService.recommend(
+                MEMBER_ID,
+                request()
+        );
+
+        assertThat(response.movies())
+                .extracting(AiRecommendedMovie::movieId)
+                .containsExactly(2L);
+
+        verify(reasonGenerator).generate(
+                eq(PROMPT),
+                argThat(selected ->
+                        selected.size() == 1
+                                && selected.get(0).movieId().equals(2L)
+                )
+        );
+    }
+
+    @Test
+    void 모든_후보가_DISLIKE면_크레딧을_사용하지_않는다() {
+
+        given(candidateService.findCandidatesForRanking())
+                .willReturn(candidates());
+
+        given(feedbackRankingService.loadProfile(MEMBER_ID))
+                .willReturn(new AiFeedbackRankingService.FeedbackProfile(
+                        Set.of(1L),
+                        Set.of()
+                ));
+
+        assertThatThrownBy(() ->
+                recommendationService.recommend(MEMBER_ID, request())
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                e -> assertThat(e.getErrorCode()).isEqualTo(
+                        CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
+                )
+        );
+
+        verifyNoInteractions(
+                preferenceService,
+                rankingService,
+                spendService,
+                reasonGenerator,
+                completeService,
+                restoreService
+        );
+    }
+
+    @Test
+    void LIKE_장르_가점으로_추천_순서가_변경된다() {
+
+        String prompt = "영화 추천해 줘";
+
+        List<AiMovieCandidate> pool = List.of(
+                movie(
+                        1L, "인기 로맨스", "연애 이야기",
+                        List.of("로맨스"), 900.0
+                ),
+                movie(
+                        2L, "우주 모험", "우주 탐험",
+                        List.of("SF"), 100.0
+                )
+        );
+
+        given(candidateService.findCandidatesForRanking())
+                .willReturn(pool);
+
+        given(feedbackRankingService.loadProfile(MEMBER_ID))
+                .willReturn(new AiFeedbackRankingService.FeedbackProfile(
+                        Set.of(),
+                        Set.of("sf")
+                ));
+
+        given(spendService.spendOne(
+                MEMBER_ID, REQUEST_KEY.toString()
+        )).willReturn(successfulSpend());
+
+        given(reasonGenerator.generate(eq(prompt), anyList()))
+                .willAnswer(invocation -> {
+
+                    List<AiMovieCandidate> selected =
+                            invocation.getArgument(1);
+
+                    return selected.stream()
+                            .map(movie -> new AiMovieReason(
+                                    movie.movieId(),
+                                    "추천 이유"
+                            ))
+                            .toList();
+                });
+
+        var response = recommendationService.recommend(
+                MEMBER_ID,
+                new AiRecommendRequest(prompt, REQUEST_KEY)
+        );
+
+        assertThat(response.movies())
+                .extracting(AiRecommendedMovie::movieId)
+                .containsExactly(2L, 1L);
+
+        verify(completeService)
+                .completeOne(MEMBER_ID, REQUEST_KEY.toString());
+    }
+
+    private void givenEmptyProfile(Long memberId) {
+        given(feedbackRankingService.loadProfile(memberId))
+                .willReturn(new AiFeedbackRankingService.FeedbackProfile(
+                        Set.of(),
+                        Set.of()
+                ));
     }
 
     private AiCreditSpendService.SpendResult successfulSpend() {
         return new AiCreditSpendService.SpendResult(
-                AiCreditBucket.FREE, 2, 0, false
+                AiCreditBucket.FREE,
+                2,
+                0,
+                false
         );
     }
 
