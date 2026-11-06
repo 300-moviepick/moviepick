@@ -6,6 +6,7 @@ import com.moviepick.domain.community.entity.PostStatus;
 import com.moviepick.domain.community.repository.PostLikeRepository;
 import com.moviepick.domain.community.repository.PostRepository;
 import com.moviepick.domain.community.service.PostLikeService;
+import com.moviepick.domain.community.service.PostListCacheService;
 import com.moviepick.domain.community.service.PostService;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.repository.MemberRepository;
@@ -61,7 +62,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         MemberStatusChecker.class,
         OAuth2LoginFailureHandler.class,
         PostService.class,
-        PostLikeService.class
+        PostLikeService.class,
+        PostListCacheService.class
 })
 @ActiveProfiles("test")
 class AdminBlindedPostDetailTest {

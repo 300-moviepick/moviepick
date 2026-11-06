@@ -2,6 +2,7 @@ package com.moviepick.global.security;
 
 import com.moviepick.domain.member.service.MemberStatusChecker;
 import com.moviepick.domain.community.controller.PostController;
+import com.moviepick.domain.community.service.PostListCacheService;
 import com.moviepick.domain.community.service.PostService;
 import com.moviepick.domain.member.controller.MemberController;
 import com.moviepick.domain.member.exception.MemberErrorCode;
@@ -94,6 +95,8 @@ class JwtAuthenticationFilterTest {
     private ReviewService reviewService;
     @MockitoBean
     private PostService postService;
+    @MockitoBean
+    private PostListCacheService postListCacheService;
     @MockitoBean
     private AuthService authService;
     @MockitoBean
