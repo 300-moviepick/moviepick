@@ -44,3 +44,5 @@ application-local.yml
 # 영화 데이터 등 저장소에 올리지 않는 초기 데이터 (db/seed/에 두면 컨테이너 첫 생성 때 실행)
 db/seed/*
 !db/seed/.gitkeep
+perf/results/*
+!perf/results/_template.md
