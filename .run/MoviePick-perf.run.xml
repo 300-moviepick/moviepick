@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="MoviePick-perf" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <option name="ACTIVE_PROFILES" value="local" />
+    <module name="moviepick.main" />
+    <option name="PROGRAM_PARAMETERS" value="--logging.level.org.hibernate.SQL=warn --spring.jpa.properties.hibernate.format_sql=false --notification.scheduler.enabled=false --movie.batch.scheduler.enabled=false" />
+    <option name="SHORTEN_COMMAND_LINE" value="MANIFEST" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.moviepick.MoviePickApplication" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

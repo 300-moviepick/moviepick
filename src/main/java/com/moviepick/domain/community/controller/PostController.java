@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.community.controller;
 
 import com.moviepick.domain.community.dto.request.PostCreateRequest;
@@ -7,6 +6,7 @@ import com.moviepick.domain.community.dto.response.PostCreateResponse;
 import com.moviepick.domain.community.dto.response.PostDetailResponse;
 import com.moviepick.domain.community.dto.response.PostListResponse;
 import com.moviepick.domain.community.dto.response.PostUpdateResponse;
+import com.moviepick.domain.community.service.PostListCacheService;
 import com.moviepick.domain.community.service.PostService;
 import com.moviepick.global.security.LoginMember;
 import com.moviepick.global.exception.BusinessException;
@@ -15,7 +15,6 @@ import com.moviepick.global.response.ApiResponse;
 import com.moviepick.global.response.PageResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +35,7 @@ import org.springframework.security.core.Authentication;
 public class PostController {
 
     private final PostService postService;
+    private final PostListCacheService postListCacheService;
 
     // 게시글 작성
     @PostMapping
@@ -67,12 +67,19 @@ public class PostController {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
-        Page<PostListResponse> response =
-                postService.getPosts(q, sort, pageable);
+        PageResponse<PostListResponse> response;
 
-        return ResponseEntity.ok(
-                ApiResponse.ok(PageResponse.from(response))
-        );
+        // 인기순 + 검색어 없음만 캐시 사용 (page 0~4, TTL 3분). 최신순·검색은 기존 그대로
+        if ("popular".equalsIgnoreCase(sort) && (q == null || q.isBlank())) {
+            response = postListCacheService.getPopularPosts(
+                    pageable.getPageNumber(),
+                    pageable.getPageSize()
+            );
+        } else {
+            response = PageResponse.from(postService.getPosts(q, sort, pageable));
+        }
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     // 게시글 상세 조회

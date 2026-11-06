@@ -29,6 +29,17 @@ class ArchitectureTest {
             slices().matching("com.moviepick.domain.(*)..")
                     .should().beFreeOfCycles();
 
+    // PortOne 웹훅 공통 컴포넌트는 결제 유형과 무관해야 한다 (후원 전용 코드에 의존하지 않음)
+    @ArchTest
+    static final ArchRule portone_웹훅_공통_컴포넌트는_후원_전용_코드에_의존하지_않는다 =
+            noClasses().that().resideInAPackage("com.moviepick.domain.support.client.webhook..")
+                    .should().dependOnClassesThat().resideInAnyPackage(
+                            "com.moviepick.domain.support.service..",
+                            "com.moviepick.domain.support.entity..",
+                            "com.moviepick.domain.support.repository..",
+                            "com.moviepick.domain.support.controller..",
+                            "com.moviepick.domain.support.exception..");
+
     @ArchTest
     static final ArchRule admin은_repository와_entity를_직접_쓰지_않는다 =
             noClasses().that().resideInAPackage("com.moviepick.domain.admin..")

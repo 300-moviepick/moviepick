@@ -33,6 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -61,7 +67,39 @@ public class AdminReportService {
                 ? communityReportRepository.findAll(pageable)
                 : communityReportRepository.findByStatus(status, pageable);
 
-        return reports.map(this::createReportResponse);
+        // 신고 대상 id를 유형별로 모아 한 번에 조회 (행마다 조회하던 N+1 제거)
+        Set<Long> postIds = new HashSet<>();
+        Set<Long> reviewIds = new HashSet<>();
+        for (CommunityReport report : reports.getContent()) {
+            if (report.getTargetType() == ReportTargetType.POST) {
+                postIds.add(report.getTargetId());
+            } else if (report.getTargetType() == ReportTargetType.REVIEW) {
+                reviewIds.add(report.getTargetId());
+            }
+        }
+
+        Map<Long, Post> postMap = findPostMap(postIds);
+        Map<Long, Review> reviewMap = findReviewMap(reviewIds);
+
+        return reports.map(report -> createReportResponse(report, postMap, reviewMap));
+    }
+
+    // 신고 대상 게시글 일괄 조회 (id가 없으면 쿼리를 보내지 않는다)
+    private Map<Long, Post> findPostMap(Collection<Long> postIds) {
+        if (postIds.isEmpty()) {
+            return Map.of();
+        }
+        return communityReportRepository.findPostsWithMemberByIdIn(postIds).stream()
+                .collect(Collectors.toMap(Post::getId, Function.identity()));
+    }
+
+    // 신고 대상 리뷰 일괄 조회 (id가 없으면 쿼리를 보내지 않는다)
+    private Map<Long, Review> findReviewMap(Collection<Long> reviewIds) {
+        if (reviewIds.isEmpty()) {
+            return Map.of();
+        }
+        return communityReportRepository.findReviewsWithMemberByIdIn(reviewIds).stream()
+                .collect(Collectors.toMap(Review::getId, Function.identity()));
     }
 
     // 관리자: 신고 승인 또는 반려
@@ -300,6 +338,41 @@ public class AdminReportService {
                             review.getMovie().getId()
                     ))
                     .orElseGet(() -> AdminReportResponse.from(report));
+        }
+
+        return AdminReportResponse.from(report);
+    }
+
+    // 신고 목록용 응답 생성: 미리 조회한 대상으로 만든다 (대상이 없으면 대상 정보 없이 반환)
+    private AdminReportResponse createReportResponse(
+            CommunityReport report,
+            Map<Long, Post> postMap,
+            Map<Long, Review> reviewMap
+    ) {
+        if (report.getTargetType() == ReportTargetType.POST) {
+            Post post = postMap.get(report.getTargetId());
+            if (post == null) {
+                return AdminReportResponse.from(report);
+            }
+            return AdminReportResponse.from(
+                    report,
+                    post.getTitle(),
+                    createPreview(post.getContent()),
+                    post.getMember().getNickname()
+            );
+        }
+
+        if (report.getTargetType() == ReportTargetType.REVIEW) {
+            Review review = reviewMap.get(report.getTargetId());
+            if (review == null) {
+                return AdminReportResponse.from(report);
+            }
+            return AdminReportResponse.forReview(
+                    report,
+                    createPreview(review.getContent()),
+                    review.getMember().getNickname(),
+                    review.getMovie().getId()
+            );
         }
 
         return AdminReportResponse.from(report);
