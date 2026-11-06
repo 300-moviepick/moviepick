@@ -25,10 +25,13 @@ public class AiMovieCandidateService {
     private static final int MAX_CANDIDATES = 20;
     private static final int SEARCH_POOL_SIZE = 100;
 
+    // AI 랭킹에서 비교할 최대 영화 수
+    private static final int RANKING_POOL_SIZE = 5000;
+
     private final MovieRepository movieRepository;
     private final MovieGenreRepository movieGenreRepository;
 
-    // 기존: 직접 지정한 개수만큼 후보 반환
+    // 기존 일반 후보 조회 API 유지
     public List<AiMovieCandidate> findCandidates(int limit) {
 
         if (limit < 1 || limit > MAX_CANDIDATES) {
@@ -40,17 +43,23 @@ public class AiMovieCandidateService {
         return loadCandidates(limit);
     }
 
-    // [추가 ①] 랭킹에 사용할 후보 풀 조회
+    // 전체 영화 후보를 대상으로 하이브리드 랭킹
     public List<AiMovieCandidate> findCandidatesForRanking() {
-        return loadCandidates(SEARCH_POOL_SIZE);
+        return loadCandidates(RANKING_POOL_SIZE);
     }
 
-    // [변경 ②] 기존 조회 로직을 공통 메서드로 분리
     private List<AiMovieCandidate> loadCandidates(int limit) {
+
+        // 일반 조회는 100편 안에서 선택,
+        // AI 랭킹은 최대 5000편까지 조회
+        int fetchSize = Math.max(
+                SEARCH_POOL_SIZE,
+                limit
+        );
 
         PageRequest pageable = PageRequest.of(
                 0,
-                SEARCH_POOL_SIZE,
+                fetchSize,
                 Sort.by(
                         Sort.Order.desc("popularity"),
                         Sort.Order.desc("id")
@@ -70,12 +79,12 @@ public class AiMovieCandidateService {
             return List.of();
         }
 
-        // ② 후보 영화 ID 추출
+        // ② 조회된 영화 ID 수집
         List<Long> movieIds = movies.stream()
                 .map(Movie::getId)
                 .toList();
 
-        // ③ 장르 일괄 조회
+        // ③ 영화 장르 일괄 조회
         Map<Long, List<String>> genreMap = movieGenreRepository
                 .findAllByMovie_IdIn(movieIds)
                 .stream()

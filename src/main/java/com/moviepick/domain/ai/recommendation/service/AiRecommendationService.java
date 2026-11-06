@@ -18,156 +18,255 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.function.ToDoubleFunction;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(
         name = "spring.ai.model.chat",
-        havingValue = "ollama"
+        havingValue = "openai"
 )
 public class AiRecommendationService {
 
     private static final int CANDIDATE_LIMIT = 3;
 
     private final AiMovieCandidateService candidateService;
-
-    // [추가 ①] 영화 관련성 점수 계산
     private final AiMovieRankingService rankingService;
-
+    private final AiMemberGenrePreferenceService preferenceService;
+    private final AiFeedbackRankingService feedbackRankingService;
+    private final AiHybridRankingScoreService hybridRankingScoreService;
     private final AiMovieReasonGenerator reasonGenerator;
-
     private final AiCreditSpendService spendService;
     private final AiCreditCompleteService completeService;
     private final AiCreditRestoreService restoreService;
 
-    // 외부 AI 호출 중 DB 트랜잭션을 유지하지 않는다.
     public AiRecommendResponse recommend(
             Long memberId,
             AiRecommendRequest request
     ) {
-        String requestKey = request.requestKey().toString();
 
-        // [변경 ②] 랭킹을 위한 영화 후보 확보
+        // ① 영화 후보 조회
         List<AiMovieCandidate> candidatePool =
                 candidateService.findCandidatesForRanking();
 
-        if (candidatePool.isEmpty()) {
+        if (candidatePool == null || candidatePool.isEmpty()) {
             throw new BusinessException(
                     CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
             );
         }
 
-        // [추가 ③] 사용자 요청과 관련성 높은 상위 3편 선정
-        List<AiMovieCandidate> candidates =
-                rankingService.rank(
+        // ② 회원 피드백 조회
+        var feedbackProfile =
+                feedbackRankingService.loadProfile(memberId);
+
+        // ③ DISLIKE 영화 제외
+        List<AiMovieCandidate> availableCandidates =
+                candidatePool.stream()
+                        .filter(movie ->
+                                !feedbackProfile.isDisliked(movie)
+                        )
+                        .toList();
+
+        if (availableCandidates.isEmpty()) {
+            throw new BusinessException(
+                    CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
+            );
+        }
+
+        // ④ 회원 장르 선호도 조회
+        Map<String, Double> genreWeights =
+                preferenceService.getGenreWeights(memberId);
+
+        // ⑤ 기존 개인화 점수 계산
+        ToDoubleFunction<AiMovieCandidate> personalizationScore =
+                movie ->
+                        preferenceService.scoreGenrePreference(
+                                movie,
+                                genreWeights
+                        ) + feedbackProfile.bonusFor(movie);
+
+        // ⑥ 의미 검색 점수 결합
+        ToDoubleFunction<AiMovieCandidate> hybridScore =
+                hybridRankingScoreService.compose(
                         request.prompt(),
-                        candidatePool,
-                        CANDIDATE_LIMIT
+                        availableCandidates,
+                        personalizationScore
                 );
 
-        if (candidates.isEmpty()) {
+        // ⑦ 최종 추천 후보 선정
+        List<AiMovieCandidate> rankedCandidates =
+                rankingService.rank(
+                        request.prompt(),
+                        availableCandidates,
+                        CANDIDATE_LIMIT,
+                        hybridScore
+                );
+
+        if (rankedCandidates == null || rankedCandidates.isEmpty()) {
             throw new BusinessException(
                     CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
             );
         }
 
-        // ④ 기존: 크레딧 1회 차감
-        var spendResult = spendService.spendOne(
-                memberId,
-                requestKey
-        );
+        String requestKey = request.requestKey().toString();
 
+        // ⑧ AI 크레딧 사용
+        AiCreditSpendService.SpendResult spendResult =
+                spendService.spendOne(
+                        memberId,
+                        requestKey
+                );
+
+        // ⑨ 동일 요청 중복 처리
         if (spendResult.duplicate()) {
             throw new BusinessException(
                     CommonErrorCode.AI_RECOMMENDATION_IN_PROGRESS
             );
         }
 
-        List<AiRecommendedMovie> movies;
+        List<AiRecommendedMovie> recommendedMovies;
 
         try {
-            // ⑤ 기존: 랭킹된 영화에 대한 AI 추천 이유 생성
+
+            // ⑩ LLM 추천 이유 생성
+            log.info(
+                    "AI 추천 이유 생성 시작. memberId={}, requestKey={}, movies={}",
+                    memberId,
+                    requestKey,
+                    rankedCandidates.size()
+            );
+
             List<AiMovieReason> reasons =
                     reasonGenerator.generate(
                             request.prompt(),
-                            candidates
+                            rankedCandidates
                     );
 
-            movies = combineResults(candidates, reasons);
+            log.info(
+                    "AI 추천 이유 생성 완료. memberId={}, requestKey={}",
+                    memberId,
+                    requestKey
+            );
+
+            // ⑪ 추천 결과 검증 및 응답 변환
+            recommendedMovies = combineResults(
+                    rankedCandidates,
+                    reasons
+            );
+
+            log.info(
+                    "AI 추천 결과 검증 완료. memberId={}, requestKey={}",
+                    memberId,
+                    requestKey
+            );
 
         } catch (RuntimeException aiFailure) {
 
+            // [추가] 원본 예외와 스택 트레이스 출력
+            log.error(
+                    "AI 추천 처리 실패. memberId={}, requestKey={}",
+                    memberId,
+                    requestKey,
+                    aiFailure
+            );
+
+            // ⑫ 실패 시 크레딧 복구
             try {
-                restoreService.restoreOne(memberId, requestKey);
+                restoreService.restoreOne(
+                        memberId,
+                        requestKey
+                );
+
+                log.info(
+                        "AI 크레딧 복구 처리 완료. memberId={}, requestKey={}",
+                        memberId,
+                        requestKey
+                );
 
             } catch (RuntimeException restoreFailure) {
+
                 log.error(
-                        "AI 추천 실패 후 크레딧 복구도 실패. memberId={}, requestKey={}",
+                        "AI 크레딧 복구 실패. memberId={}, requestKey={}",
                         memberId,
                         requestKey,
                         restoreFailure
                 );
 
                 aiFailure.addSuppressed(restoreFailure);
-                throw aiFailure;
             }
-
-            log.warn(
-                    "AI 추천 실패로 크레딧 복구 완료. memberId={}, requestKey={}",
-                    memberId,
-                    requestKey,
-                    aiFailure
-            );
 
             throw new BusinessException(
                     CommonErrorCode.AI_RECOMMENDATION_FAILED
             );
         }
 
-        // ⑥ 기존: 추천 성공 확정
-        completeService.completeOne(memberId, requestKey);
+        // ⑬ 정상 처리 확정
+        completeService.completeOne(
+                memberId,
+                requestKey
+        );
 
+        log.info(
+                "AI 추천 성공. memberId={}, requestKey={}, movies={}",
+                memberId,
+                requestKey,
+                recommendedMovies.size()
+        );
+
+        // ⑭ 응답 반환
         return new AiRecommendResponse(
                 request.requestKey(),
-                movies
+                recommendedMovies
         );
     }
 
+    // LLM 결과의 영화 ID와 추천 후보 검증
     private List<AiRecommendedMovie> combineResults(
             List<AiMovieCandidate> candidates,
             List<AiMovieReason> reasons
     ) {
-        if (reasons == null || reasons.size() != candidates.size()) {
+
+        if (reasons == null
+                || reasons.size() != candidates.size()) {
             throw new IllegalStateException(
                     "AI 추천 결과의 영화 수가 일치하지 않습니다."
             );
         }
 
-        Set<Long> candidateIds = candidates.stream()
-                .map(AiMovieCandidate::movieId)
-                .collect(Collectors.toSet());
-
         Map<Long, String> reasonMap = new HashMap<>();
 
-        for (AiMovieReason item : reasons) {
+        for (AiMovieReason reason : reasons) {
 
-            if (item == null
-                    || item.movieId() == null
-                    || !candidateIds.contains(item.movieId())
-                    || item.reason() == null
-                    || item.reason().isBlank()) {
+            if (reason == null
+                    || reason.movieId() == null
+                    || reason.reason() == null
+                    || reason.reason().isBlank()) {
                 throw new IllegalStateException(
                         "AI 추천 결과에 잘못된 영화가 포함되었습니다."
                 );
             }
 
-            if (reasonMap.putIfAbsent(
-                    item.movieId(),
-                    item.reason()
-            ) != null) {
+            boolean candidateExists =
+                    candidates.stream()
+                            .anyMatch(movie ->
+                                    movie.movieId().equals(
+                                            reason.movieId()
+                                    )
+                            );
+
+            if (!candidateExists) {
+                throw new IllegalStateException(
+                        "AI 추천 결과에 잘못된 영화가 포함되었습니다."
+                );
+            }
+
+            String previous = reasonMap.putIfAbsent(
+                    reason.movieId(),
+                    reason.reason()
+            );
+
+            if (previous != null) {
                 throw new IllegalStateException(
                         "AI 추천 결과에 중복 영화가 있습니다."
                 );
@@ -175,12 +274,14 @@ public class AiRecommendationService {
         }
 
         return candidates.stream()
-                .map(movie -> new AiRecommendedMovie(
-                        movie.movieId(),
-                        movie.title(),
-                        movie.posterUrl(),
-                        reasonMap.get(movie.movieId())
-                ))
+                .map(movie ->
+                        new AiRecommendedMovie(
+                                movie.movieId(),
+                                movie.title(),
+                                movie.posterUrl(),
+                                reasonMap.get(movie.movieId())
+                        )
+                )
                 .toList();
     }
 }

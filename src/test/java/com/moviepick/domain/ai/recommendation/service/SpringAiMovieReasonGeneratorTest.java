@@ -165,4 +165,35 @@ class SpringAiMovieReasonGeneratorTest {
                 )
         );
     }
+
+    @Test
+    void 잘못된_영화_ID가_반환되면_재시도해서_성공한다() {
+
+        AiMovieReasonBatch invalidResponse =
+                new AiMovieReasonBatch(List.of(
+                        new AiMovieReason(999L, "잘못된 영화입니다.")
+                ));
+
+        AiMovieReasonBatch validResponse =
+                new AiMovieReasonBatch(List.of(
+                        new AiMovieReason(1L, "우주와 가족의 사랑을 다룹니다."),
+                        new AiMovieReason(2L, "인간관계의 감동을 그립니다.")
+                ));
+
+        when(chatClient.prompt()
+                .system(anyString())
+                .user(anyString())
+                .call()
+                .entity(eq(AiMovieReasonBatch.class), any()))
+                .thenReturn(invalidResponse, validResponse);
+
+        List<AiMovieReason> result = generator.generate(
+                "감동적인 SF 영화를 추천해 줘",
+                candidates()
+        );
+
+        assertThat(result)
+                .extracting(AiMovieReason::movieId)
+                .containsExactly(1L, 2L);
+    }
 }

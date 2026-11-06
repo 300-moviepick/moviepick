@@ -91,10 +91,6 @@ public class AiMemberGenrePreferenceService {
             double weight =
                     (review.getRating().doubleValue() - 3.0) * 4.0;
 
-            if (weight == 0.0) {
-                continue;
-            }
-
             List<String> genres = genreMap.getOrDefault(
                     review.getMovie().getId(),
                     List.of()

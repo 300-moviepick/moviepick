@@ -12,6 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.ToDoubleFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -92,13 +93,34 @@ public class AiMovieRankingService {
             )
     );
 
-    // 사용자 요청과 영화 정보를 비교해 순위를 계산한다.
+    // 기존 호출 방식 유지
     public List<AiMovieCandidate> rank(
             String userRequest,
             List<AiMovieCandidate> candidates,
             int limit
     ) {
+        return rank(
+                userRequest,
+                candidates,
+                limit,
+                movie -> 0.0
+        );
+    }
+
+    // [추가] 요청 관련성과 회원 개인화 점수를 합산
+    public List<AiMovieCandidate> rank(
+            String userRequest,
+            List<AiMovieCandidate> candidates,
+            int limit,
+            ToDoubleFunction<AiMovieCandidate> personalizationScore
+    ) {
         validate(userRequest, candidates, limit);
+
+        if (personalizationScore == null) {
+            throw new BusinessException(
+                    CommonErrorCode.INVALID_INPUT
+            );
+        }
 
         if (candidates.isEmpty()) {
             return List.of();
@@ -107,7 +129,6 @@ public class AiMovieRankingService {
         String request = normalize(userRequest);
         List<String> keywords = extractKeywords(request);
 
-        // 중복 영화 ID 제거
         LinkedHashMap<Long, AiMovieCandidate> unique =
                 new LinkedHashMap<>();
 
@@ -121,30 +142,49 @@ public class AiMovieRankingService {
             unique.putIfAbsent(movie.movieId(), movie);
         }
 
-        List<AiMovieCandidate> ranked =
-                new ArrayList<>(unique.values());
+        // [추가] 영화마다 최종 점수를 한 번씩 계산
+        List<ScoredMovie> scoredMovies = new ArrayList<>();
 
-        // 관련성 점수 → 인기도 → 영화 ID 순서
-        ranked.sort(
+        for (AiMovieCandidate movie : unique.values()) {
+            double relevance = calculateScore(
+                    request, keywords, movie
+            );
+
+            double preference =
+                    personalizationScore.applyAsDouble(movie);
+
+            if (!Double.isFinite(preference)) {
+                throw new BusinessException(
+                        CommonErrorCode.INVALID_INPUT
+                );
+            }
+
+            scoredMovies.add(new ScoredMovie(
+                    movie,
+                    relevance + preference
+            ));
+        }
+
+        scoredMovies.sort(
                 Comparator
-                        .comparingInt(
-                                (AiMovieCandidate movie) ->
-                                        calculateScore(
-                                                request, keywords, movie
-                                        )
-                        )
+                        .comparingDouble(ScoredMovie::score)
                         .reversed()
                         .thenComparing(
                                 Comparator.comparingDouble(
-                                        (AiMovieCandidate movie) ->
-                                                safePopularity(movie.popularity())
+                                        (ScoredMovie item) ->
+                                                safePopularity(
+                                                        item.movie().popularity()
+                                                )
                                 ).reversed()
                         )
-                        .thenComparing(AiMovieCandidate::movieId)
+                        .thenComparing(
+                                item -> item.movie().movieId()
+                        )
         );
 
-        return ranked.stream()
+        return scoredMovies.stream()
                 .limit(limit)
+                .map(ScoredMovie::movie)
                 .toList();
     }
 
@@ -158,9 +198,9 @@ public class AiMovieRankingService {
         String title = normalize(movie.title());
         String overview = normalize(movie.overview());
 
-        // ① 장르 일치 점수
         for (GenreRule rule : GENRE_RULES) {
-            boolean requested = rule.requestWords().stream()
+            boolean requested = rule.requestWords()
+                    .stream()
                     .anyMatch(request::contains);
 
             boolean genreMatched = movie.genres() != null
@@ -168,7 +208,8 @@ public class AiMovieRankingService {
                     .filter(genre -> genre != null)
                     .map(this::normalize)
                     .anyMatch(genre ->
-                            rule.genreNames().stream()
+                            rule.genreNames()
+                                    .stream()
                                     .anyMatch(genre::contains)
                     );
 
@@ -177,7 +218,6 @@ public class AiMovieRankingService {
             }
         }
 
-        // ② 제목·줄거리 키워드 점수
         for (String keyword : keywords) {
             if (title.contains(keyword)) {
                 score += TITLE_SCORE;
@@ -192,7 +232,6 @@ public class AiMovieRankingService {
     }
 
     private List<String> extractKeywords(String request) {
-
         Set<String> keywords = new LinkedHashSet<>();
         Matcher matcher = WORD_PATTERN.matcher(request);
 
@@ -209,7 +248,6 @@ public class AiMovieRankingService {
     }
 
     private String removeSuffix(String word) {
-
         for (String suffix : SUFFIXES) {
             if (word.endsWith(suffix)
                     && word.length() - suffix.length() >= 2) {
@@ -256,6 +294,12 @@ public class AiMovieRankingService {
     private record GenreRule(
             List<String> requestWords,
             List<String> genreNames
+    ) {
+    }
+
+    private record ScoredMovie(
+            AiMovieCandidate movie,
+            double score
     ) {
     }
 }
