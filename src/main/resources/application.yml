@@ -20,7 +20,7 @@ spring:
     active: local
   # 프로젝트 맨 위의 .env를 설정으로 읽는다 (없으면 무시). docker compose와 같은 파일
   config:
-    import: "file:./.env[.properties]"
+    import: "optional:file:./.env[.properties]"
   batch:
     job:
       enabled: false
