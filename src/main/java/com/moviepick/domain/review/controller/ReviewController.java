@@ -9,6 +9,7 @@ import com.moviepick.domain.review.dto.response.ReviewResponse;
 import com.moviepick.domain.review.dto.response.ReviewUpdateResponse;
 import com.moviepick.domain.review.dto.response.ReviewWithMovieResponse;
 import com.moviepick.domain.review.service.ReviewLikeService;
+import com.moviepick.domain.review.service.ReviewListCacheService;
 import com.moviepick.domain.review.service.ReviewService;
 import com.moviepick.global.security.LoginMember;
 import com.moviepick.global.response.ApiResponse;
@@ -30,6 +31,7 @@ public class ReviewController {
 
     private final ReviewService reviewService;
     private final ReviewLikeService reviewLikeService;
+    private final ReviewListCacheService reviewListCacheService;
 
     /** 리뷰 작성 */
     @PostMapping("/movies/{movieId}/reviews")
@@ -59,8 +61,13 @@ public class ReviewController {
             @RequestParam(defaultValue = "latest") String sort,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ResponseEntity.ok(ApiResponse.ok(
-                reviewService.getReviews(ReviewSort.from(sort), page, size)));
+        ReviewSort reviewSort = ReviewSort.from(sort);
+
+        // 좋아요순은 정렬 비용이 커서 앞쪽 페이지를 캐시로 응답한다
+        PageResponse<ReviewWithMovieResponse> reviews = reviewSort == ReviewSort.LIKES
+                ? reviewListCacheService.getReviewsByLikes(page, size)
+                : reviewService.getReviews(reviewSort, page, size);
+        return ResponseEntity.ok(ApiResponse.ok(reviews));
     }
 
     /** 내 리뷰 조회 */
