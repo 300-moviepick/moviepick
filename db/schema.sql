@@ -67,6 +67,8 @@ CREATE TABLE `community_reports` (
   UNIQUE KEY `uk_report_reporter_target` (`reporter_id`,`target_type`,`target_id`),
   KEY `FK12s2daju3wxyu5g9baq6ij9od` (`reporter_id`),
   KEY `idx_report_target_status` (`target_type`,`target_id`,`status`),
+  KEY `idx_report_status_created_at` (`status`,`created_at`,`id`),
+  KEY `idx_report_created_at` (`created_at`,`id`),
   CONSTRAINT `FK12s2daju3wxyu5g9baq6ij9od` FOREIGN KEY (`reporter_id`) REFERENCES `members` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
