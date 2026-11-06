@@ -12,6 +12,7 @@ import com.moviepick.global.exception.BusinessException;
 import com.moviepick.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -22,6 +23,10 @@ import java.util.function.ToDoubleFunction;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(
+        name = "spring.ai.model.chat",
+        havingValue = "openai"
+)
 public class AiRecommendationService {
 
     private static final int CANDIDATE_LIMIT = 3;
