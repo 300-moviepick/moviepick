@@ -21,6 +21,16 @@ import lombok.NoArgsConstructor;
                 @Index(
                         name = "idx_report_target_status",
                         columnList = "target_type, target_id, status"
+                ),
+                // 관리자 신고 목록: 상태 필터 + 최신순 정렬 + 상태별 개수
+                @Index(
+                        name = "idx_report_status_created_at",
+                        columnList = "status, created_at, id"
+                ),
+                // 관리자 신고 목록: 전체 최신순 정렬
+                @Index(
+                        name = "idx_report_created_at",
+                        columnList = "created_at, id"
                 )
         }
 )
