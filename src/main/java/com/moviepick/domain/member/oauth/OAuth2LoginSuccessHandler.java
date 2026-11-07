@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
@@ -30,6 +31,10 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final JwtProvider jwtProvider;
     private final RefreshTokenService refreshTokenService;
     private final FrontendProperties frontendProperties;
+
+    // refreshToken 쿠키 Secure 속성 (app.cookie.secure, 로컬 기본 false)
+    @Value("${app.cookie.secure:false}")
+    private boolean secureCookie;
 
     @Override
     public void onAuthenticationSuccess(
@@ -122,7 +127,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         ResponseCookie cookie = ResponseCookie
                 .from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .secure(false) // 로컬 HTTP 테스트용
+                .secure(secureCookie)
                 .sameSite("Strict")
                 .path("/api/auth")
                 .maxAge(14 * 24 * 60 * 60)

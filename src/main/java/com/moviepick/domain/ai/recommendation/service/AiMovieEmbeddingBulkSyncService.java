@@ -12,8 +12,9 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+// 임베딩 동기화 서비스(AiMovieEmbeddingSyncService)와 같은 embedding 스위치를 따른다
 @ConditionalOnProperty(
-        name = "spring.ai.model.chat",
+        name = "spring.ai.model.embedding",
         havingValue = "openai"
 )
 public class AiMovieEmbeddingBulkSyncService {

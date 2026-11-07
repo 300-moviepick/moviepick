@@ -4,6 +4,7 @@ import com.moviepick.domain.ai.credit.entity.AiCreditBucket;
 import com.moviepick.domain.ai.credit.service.AiCreditCompleteService;
 import com.moviepick.domain.ai.credit.service.AiCreditRestoreService;
 import com.moviepick.domain.ai.credit.service.AiCreditSpendService;
+import com.moviepick.domain.ai.credit.service.AiCreditWalletProvisioner;
 import com.moviepick.domain.ai.recommendation.dto.AiMovieCandidate;
 import com.moviepick.domain.ai.recommendation.dto.AiMovieReason;
 import com.moviepick.domain.ai.recommendation.dto.AiRecommendRequest;
@@ -69,6 +70,9 @@ class AiHybridRecommendationFlowTest {
     @Mock
     private AiCreditRestoreService restoreService;
 
+    @Mock
+    private AiCreditWalletProvisioner walletProvisioner;
+
     private AiRecommendationService recommendationService;
 
     @BeforeEach
@@ -94,7 +98,8 @@ class AiHybridRecommendationFlowTest {
                 reasonGenerator,
                 spendService,
                 completeService,
-                restoreService
+                restoreService,
+                walletProvisioner
         );
     }
 
