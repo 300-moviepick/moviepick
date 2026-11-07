@@ -1,6 +1,11 @@
 package com.moviepick.domain.ai;
 
+import com.moviepick.domain.ai.credit.controller.AiCreditPurchaseController;
+import com.moviepick.domain.ai.credit.controller.AiCreditStoreController;
+import com.moviepick.domain.ai.credit.service.AiCreditPurchaseService;
 import com.moviepick.domain.ai.recommendation.controller.AiRecommendationController;
+import com.moviepick.domain.support.entity.ProductType;
+import com.moviepick.domain.support.service.port.PaidPaymentHandler;
 import com.moviepick.domain.ai.recommendation.service.AiMovieEmbeddingBulkSyncService;
 import com.moviepick.domain.ai.recommendation.service.AiMovieEmbeddingService;
 import com.moviepick.domain.ai.recommendation.service.AiMovieSemanticSimilarityService;
@@ -30,6 +35,16 @@ class AiProviderSwitchContextTest {
         return context.getBeanNamesForType(type).length > 0;
     }
 
+    // 크레딧 결제: 구매 확정·웹훅 지급은 스위치와 관계없이 항상, 상품 목록·구매 생성은 chat=openai일 때만
+    void assertCreditPurchase(boolean storeExpected) {
+        assertThat(has(AiCreditPurchaseController.class)).isTrue();
+        assertThat(has(AiCreditPurchaseService.class)).isTrue();
+        assertThat(context.getBeansOfType(PaidPaymentHandler.class).values())
+                .extracting(PaidPaymentHandler::productType)
+                .containsExactlyInAnyOrder(ProductType.SITE_SUPPORT, ProductType.AI_CREDIT);
+        assertThat(has(AiCreditStoreController.class)).isEqualTo(storeExpected);
+    }
+
     @Nested
     @DisplayName("chat=none, embedding=none (기본값)")
     @TestPropertySource(properties = {
@@ -44,6 +59,7 @@ class AiProviderSwitchContextTest {
             assertThat(has(AiMovieEmbeddingService.class)).isFalse();
             assertThat(has(AiMovieSemanticSimilarityService.class)).isFalse();
             assertThat(has(AiMovieEmbeddingBulkSyncService.class)).isFalse();
+            assertCreditPurchase(false);
         }
     }
 
@@ -61,6 +77,7 @@ class AiProviderSwitchContextTest {
             assertThat(has(AiMovieEmbeddingService.class)).isTrue();
             assertThat(has(AiMovieSemanticSimilarityService.class)).isTrue();
             assertThat(has(AiMovieEmbeddingBulkSyncService.class)).isTrue();
+            assertCreditPurchase(false);
         }
     }
 
@@ -78,6 +95,7 @@ class AiProviderSwitchContextTest {
             assertThat(has(AiMovieEmbeddingService.class)).isFalse();
             assertThat(has(AiMovieSemanticSimilarityService.class)).isFalse();
             assertThat(has(AiMovieEmbeddingBulkSyncService.class)).isFalse();
+            assertCreditPurchase(true);
         }
     }
 
@@ -95,6 +113,7 @@ class AiProviderSwitchContextTest {
             assertThat(has(AiMovieEmbeddingService.class)).isTrue();
             assertThat(has(AiMovieSemanticSimilarityService.class)).isTrue();
             assertThat(has(AiMovieEmbeddingBulkSyncService.class)).isTrue();
+            assertCreditPurchase(true);
         }
     }
 }

@@ -24,6 +24,7 @@ import com.moviepick.domain.support.exception.SupportErrorCode;
 import com.moviepick.domain.support.repository.PaymentRepository;
 import com.moviepick.global.exception.BusinessException;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,7 +61,7 @@ class SupportWebhookServiceTest {
         PortOneProperties properties = new PortOneProperties(
                 "https://api.portone.io", "test-api-secret", "test-store-id", "test-channel-key", "test-webhook-secret");
         SupportService supportService = new SupportService(paymentRepository, memberService, portOneClient, properties);
-        supportWebhookService = new SupportWebhookService(paymentRepository, supportService, webhookReceiver);
+        supportWebhookService = new SupportWebhookService(paymentRepository, webhookReceiver, List.of(supportService));
 
         owner = Member.createLocal("owner@test.com", "encoded", "owner");
         ReflectionTestUtils.setField(owner, "id", 1L);

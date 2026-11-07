@@ -139,7 +139,7 @@ CREATE TABLE `payments` (
   `paid_at` datetime(6) DEFAULT NULL,
   `updated_at` datetime(6) NOT NULL,
   `payment_id` varchar(64) NOT NULL,
-  `product_type` enum('SITE_SUPPORT') NOT NULL,
+  `product_type` enum('SITE_SUPPORT','AI_CREDIT') NOT NULL,
   `status` enum('CANCELLED','CREATED','EXPIRED','FAILED','PAID') NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_payments_payment_id` (`payment_id`),

@@ -3,36 +3,55 @@ package com.moviepick.domain.support.service;
 import com.moviepick.domain.support.client.PortOnePayment;
 import com.moviepick.domain.support.client.webhook.PortOneWebhookEvent;
 import com.moviepick.domain.support.client.webhook.PortOneWebhookReceiver;
-import com.moviepick.domain.support.dto.response.SupportConfirmResponse;
 import com.moviepick.domain.support.entity.Payment;
 import com.moviepick.domain.support.entity.PaymentStatus;
 import com.moviepick.domain.support.entity.ProductType;
 import com.moviepick.domain.support.exception.SupportErrorCode;
 import com.moviepick.domain.support.repository.PaymentRepository;
+import com.moviepick.domain.support.service.port.PaidPaymentHandler;
 import com.moviepick.global.exception.BusinessException;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * 후원 결제 웹훅 처리.
+ * PortOne 결제 웹훅 처리 (주소 하나, 결제 건의 상품 종류로 나눠 처리).
  *
- * <p>PAID 반영은 결제 확인(confirm)과 같은 {@link SupportService#applyPortOneResult}를 쓴다.
- * 둘 다 PaymentRepository의 조건부 UPDATE(CREATED일 때만 변경)를 거치므로,
+ * <p>PAID 반영은 상품 종류별 {@link PaidPaymentHandler}가 한다. 후원은 {@link SupportService},
+ * AI 크레딧은 ai 도메인의 구현체이고, 각자 결제 확인(confirm)과 같은 로직을 쓴다.
+ * 모두 PaymentRepository의 조건부 UPDATE(CREATED일 때만 변경)를 거치므로,
  * confirm과 웹훅 중 무엇이 먼저 오든, 웹훅이 여러 번 오든 한 번만 반영된다.
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SupportWebhookService {
 
-    // SupportService의 금액 검증 기준 통화와 같다 (불일치 로그의 기대 통화 표시용)
+    // 결제 금액 검증 기준 통화 (불일치 로그의 기대 통화 표시용)
     private static final String EXPECTED_CURRENCY = "KRW";
 
     private final PaymentRepository paymentRepository;
-    private final SupportService supportService;
     private final PortOneWebhookReceiver webhookReceiver;
+    private final Map<ProductType, PaidPaymentHandler> handlers;
+
+    public SupportWebhookService(
+            PaymentRepository paymentRepository,
+            PortOneWebhookReceiver webhookReceiver,
+            List<PaidPaymentHandler> handlers
+    ) {
+        this.paymentRepository = paymentRepository;
+        this.webhookReceiver = webhookReceiver;
+
+        Map<ProductType, PaidPaymentHandler> byType = new EnumMap<>(ProductType.class);
+        for (PaidPaymentHandler handler : handlers) {
+            if (byType.put(handler.productType(), handler) != null) {
+                throw new IllegalStateException("상품 종류별 결제 처리기가 중복됩니다: " + handler.productType());
+            }
+        }
+        this.handlers = Map.copyOf(byType);
+    }
 
     /**
      * 트랜잭션 경계는 confirm과 같다: 이 메서드에는 트랜잭션을 걸지 않는다.
@@ -59,8 +78,9 @@ public class SupportWebhookService {
         }
 
         Payment payment = found.get();
-        if (payment.getProductType() != ProductType.SITE_SUPPORT) {
-            log.warn("후원 웹훅: 후원 결제가 아님: paymentId={}, productType={}", paymentId, payment.getProductType());
+        PaidPaymentHandler handler = handlers.get(payment.getProductType());
+        if (handler == null) {
+            log.warn("결제 웹훅: 처리기가 없는 상품 종류: paymentId={}, productType={}", paymentId, payment.getProductType());
             return SupportWebhookResult.IGNORED;
         }
 
@@ -93,8 +113,8 @@ public class SupportWebhookService {
             return SupportWebhookResult.NOT_PAID;
         }
 
-        SupportConfirmResponse applied = supportService.applyPortOneResult(payment, portOnePayment);
-        return switch (applied.status()) {
+        PaymentStatus applied = handler.applyPaid(payment, portOnePayment);
+        return switch (applied) {
             case PAID -> SupportWebhookResult.PAID_APPLIED;
             case FAILED -> {
                 log.warn("후원 웹훅 결제 금액 불일치: paymentId={}, expectedAmount={}, expectedCurrency={}, "
