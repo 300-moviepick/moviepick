@@ -13,6 +13,7 @@ import com.moviepick.domain.member.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,10 @@ import java.time.Duration;
 public class AuthController {
 
     private final AuthService authService;
+
+    // refreshToken 쿠키 Secure 속성 (app.cookie.secure, 로컬 기본 false)
+    @Value("${app.cookie.secure:false}")
+    private boolean secureCookie;
 
     // 회원가입 API
     @PostMapping("/members")
@@ -80,7 +85,7 @@ public class AuthController {
         ResponseCookie deleteCookie = ResponseCookie
                 .from("refreshToken", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(secureCookie)
                 .sameSite("Strict")
                 .path("/api/auth")
                 .maxAge(0)
@@ -125,7 +130,7 @@ public class AuthController {
         return ResponseCookie
                 .from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .secure(false)
+                .secure(secureCookie)
                 .sameSite("Strict")
                 .path("/api/auth")
                 .maxAge(Duration.ofDays(14))
