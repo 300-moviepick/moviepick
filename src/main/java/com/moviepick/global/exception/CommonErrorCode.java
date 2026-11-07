@@ -69,6 +69,22 @@ public enum CommonErrorCode implements ErrorCode {
     AI_RECOMMENDATION_FAILED(
             HttpStatus.BAD_GATEWAY,
         "AI 추천 생성에 실패했습니다. 사용한 크레딧은 복구되었습니다."
+    ),
+    AI_CREDIT_PRODUCT_NOT_FOUND(
+            HttpStatus.BAD_REQUEST,
+            "존재하지 않는 AI 크레딧 상품입니다."
+    ),
+    AI_CREDIT_PURCHASE_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "존재하지 않는 AI 크레딧 구매입니다."
+    ),
+    NOT_AI_CREDIT_PURCHASE_OWNER(
+            HttpStatus.FORBIDDEN,
+            "본인의 AI 크레딧 구매만 확인할 수 있습니다."
+    ),
+    AI_CREDIT_PRICE_UNMAPPED(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "결제 금액에 맞는 AI 크레딧 상품이 없습니다. 운영자에게 문의해 주세요."
     );
 
     private final HttpStatus status;

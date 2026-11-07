@@ -11,8 +11,10 @@ import com.moviepick.domain.support.dto.response.SupportConfirmResponse;
 import com.moviepick.domain.support.dto.response.SupportCreateResponse;
 import com.moviepick.domain.support.entity.Payment;
 import com.moviepick.domain.support.entity.PaymentStatus;
+import com.moviepick.domain.support.entity.ProductType;
 import com.moviepick.domain.support.exception.SupportErrorCode;
 import com.moviepick.domain.support.repository.PaymentRepository;
+import com.moviepick.domain.support.service.port.PaidPaymentHandler;
 import com.moviepick.global.exception.BusinessException;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -31,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SupportService {
+public class SupportService implements PaidPaymentHandler {
 
     private static final String CURRENCY_KRW = "KRW";
 
@@ -69,7 +71,9 @@ public class SupportService {
      * 브라우저가 보낸 결제 결과·금액은 믿지 않고, PortOne에 직접 조회해서 판단한다.
      */
     public SupportConfirmResponse confirm(Long memberId, String paymentId) {
+        // 후원 결제만 다룬다. AI 크레딧 결제를 여기서 PAID로 바꾸면 크레딧이 지급되지 않으므로 없는 결제로 본다.
         Payment payment = paymentRepository.findByPaymentId(paymentId)
+                .filter(found -> found.getProductType() == ProductType.SITE_SUPPORT)
                 .orElseThrow(() -> new BusinessException(SupportErrorCode.SUPPORT_NOT_FOUND));
         if (!payment.isOwnedBy(memberId)) {
             throw new BusinessException(SupportErrorCode.NOT_SUPPORT_OWNER);
@@ -83,6 +87,18 @@ public class SupportService {
         return portOneClient.getPayment(paymentId)
                 .map(portOnePayment -> applyPortOneResult(payment, portOnePayment))
                 .orElseGet(() -> pending(payment));   // PortOne에 결제 건이 아직 없음
+    }
+
+    // ===================== 웹훅 (PaidPaymentHandler) =====================
+
+    @Override
+    public ProductType productType() {
+        return ProductType.SITE_SUPPORT;
+    }
+
+    @Override
+    public PaymentStatus applyPaid(Payment payment, PortOnePayment portOnePayment) {
+        return applyPortOneResult(payment, portOnePayment).status();
     }
 
     SupportConfirmResponse applyPortOneResult(Payment payment, PortOnePayment portOnePayment) {
