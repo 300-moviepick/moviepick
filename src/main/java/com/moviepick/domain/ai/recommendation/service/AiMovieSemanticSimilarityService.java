@@ -15,8 +15,10 @@ import java.util.Map;
 
 @Slf4j
 @Service
+// 임베딩 서비스(AiMovieEmbeddingService)와 같은 embedding 스위치를 따른다.
+// embedding=none이면 이 빈이 없고, AiHybridRankingScoreService가 기존 개인화 점수만 쓴다.
 @ConditionalOnProperty(
-        name = "spring.ai.model.chat",
+        name = "spring.ai.model.embedding",
         havingValue = "openai"
 )
 public class AiMovieSemanticSimilarityService {

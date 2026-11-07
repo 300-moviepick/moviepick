@@ -4,6 +4,7 @@ import com.moviepick.domain.ai.credit.entity.AiCreditBucket;
 import com.moviepick.domain.ai.credit.service.AiCreditCompleteService;
 import com.moviepick.domain.ai.credit.service.AiCreditRestoreService;
 import com.moviepick.domain.ai.credit.service.AiCreditSpendService;
+import com.moviepick.domain.ai.credit.service.AiCreditWalletProvisioner;
 import com.moviepick.domain.ai.recommendation.dto.AiMovieCandidate;
 import com.moviepick.domain.ai.recommendation.dto.AiMovieReason;
 import com.moviepick.domain.ai.recommendation.dto.AiRecommendRequest;
@@ -73,6 +74,9 @@ class AiRecommendationServiceTest {
     @Mock
     private AiCreditRestoreService restoreService;
 
+    @Mock
+    private AiCreditWalletProvisioner walletProvisioner;
+
     @InjectMocks
     private AiRecommendationService recommendationService;
 
@@ -117,12 +121,15 @@ class AiRecommendationServiceTest {
         assertThat(response.movies()).hasSize(1);
         assertThat(response.movies().get(0).movieId()).isEqualTo(1L);
 
+        // 크레딧 차감이 의미 검색(임베딩)·랭킹·LLM 호출보다 먼저다
         InOrder order = inOrder(
                 candidateService,
                 feedbackRankingService,
                 preferenceService,
-                rankingService,
+                walletProvisioner,
                 spendService,
+                hybridRankingScoreService,
+                rankingService,
                 reasonGenerator,
                 completeService
         );
@@ -136,11 +143,17 @@ class AiRecommendationServiceTest {
         order.verify(preferenceService)
                 .getGenreWeights(MEMBER_ID);
 
-        order.verify(rankingService)
-                .rank(eq(PROMPT), eq(candidates), eq(3), any());
+        order.verify(walletProvisioner)
+                .ensureWallet(MEMBER_ID);
 
         order.verify(spendService)
                 .spendOne(MEMBER_ID, REQUEST_KEY.toString());
+
+        order.verify(hybridRankingScoreService)
+                .compose(eq(PROMPT), eq(candidates), any());
+
+        order.verify(rankingService)
+                .rank(eq(PROMPT), eq(candidates), eq(3), any());
 
         order.verify(reasonGenerator)
                 .generate(PROMPT, candidates);
@@ -579,6 +592,77 @@ class AiRecommendationServiceTest {
 
         verify(completeService)
                 .completeOne(MEMBER_ID, REQUEST_KEY.toString());
+    }
+
+    @Test
+    void 크레딧이_부족하면_임베딩과_채팅을_호출하지_않는다() {
+
+        given(candidateService.findCandidatesForRanking())
+                .willReturn(candidates());
+
+        givenEmptyProfile(MEMBER_ID);
+
+        given(spendService.spendOne(
+                MEMBER_ID, REQUEST_KEY.toString()
+        )).willThrow(new BusinessException(
+                CommonErrorCode.AI_CREDIT_INSUFFICIENT
+        ));
+
+        assertThatThrownBy(() ->
+                recommendationService.recommend(MEMBER_ID, request())
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                e -> assertThat(e.getErrorCode()).isEqualTo(
+                        CommonErrorCode.AI_CREDIT_INSUFFICIENT
+                )
+        );
+
+        verify(walletProvisioner).ensureWallet(MEMBER_ID);
+
+        // 의미 검색(임베딩 호출)과 LLM 호출이 한 번도 없어야 한다
+        verify(hybridRankingScoreService, never())
+                .compose(anyString(), anyList(), any());
+        verify(reasonGenerator, never())
+                .generate(anyString(), anyList());
+
+        verifyNoInteractions(completeService, restoreService);
+    }
+
+    @Test
+    void 차감_후_랭킹_결과가_없으면_복구하고_후보_없음으로_응답한다() {
+
+        List<AiMovieCandidate> candidates = candidates();
+
+        given(candidateService.findCandidatesForRanking())
+                .willReturn(candidates);
+
+        givenEmptyProfile(MEMBER_ID);
+
+        given(spendService.spendOne(
+                MEMBER_ID, REQUEST_KEY.toString()
+        )).willReturn(successfulSpend());
+
+        doReturn(List.of())
+                .when(rankingService)
+                .rank(anyString(), anyList(), anyInt(), any());
+
+        assertThatThrownBy(() ->
+                recommendationService.recommend(MEMBER_ID, request())
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                e -> assertThat(e.getErrorCode()).isEqualTo(
+                        CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
+                )
+        );
+
+        // 차감 뒤 실패이므로 USE + RESTORE가 남는다
+        verify(restoreService)
+                .restoreOne(MEMBER_ID, REQUEST_KEY.toString());
+
+        verify(reasonGenerator, never())
+                .generate(anyString(), anyList());
+
+        verifyNoInteractions(completeService);
     }
 
     private void givenEmptyProfile(Long memberId) {
