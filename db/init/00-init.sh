@@ -1,6 +1,7 @@
 #!/bin/bash
 # Docker MySQL 컨테이너가 처음 만들어질 때(데이터 볼륨이 비어 있을 때) 한 번만 실행된다.
-# 순서: /db/schema.sql → /db/ai-credit-wallet-schema.sql → /db/ai-credit-transactions-schema.sql → /db/batch-schema.sql → /db/data.sql → /db/seed/*.sql (seed 폴더에 파일이 있을 때만)
+# 순서: /db/schema.sql → /db/movie-embeddings-schema.sql → /db/ai-credit-wallet-schema.sql → /db/ai-credit-transactions-schema.sql
+#       → /db/ai-recommendation-feedback-schema.sql → /db/batch-schema.sql → /db/data.sql → /db/seed/*.sql (seed 폴더에 파일이 있을 때만)
 # 다시 실행하려면: docker compose down -v → docker compose up -d
 #
 # MySQL 이미지는 실행 권한이 없는 .sh를 자기 셸에 포함(source)해서 돌리므로,
@@ -16,6 +17,7 @@
 
   for file in \
       /db/schema.sql \
+      /db/movie-embeddings-schema.sql \
       /db/ai-credit-wallet-schema.sql \
       /db/ai-credit-transactions-schema.sql \
       /db/ai-recommendation-feedback-schema.sql \
