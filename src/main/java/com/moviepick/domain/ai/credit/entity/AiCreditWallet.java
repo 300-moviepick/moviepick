@@ -69,6 +69,19 @@ public class AiCreditWallet {
         );
     }
 
+    // 유료 크레딧 충전 (결제 완료 후)
+    public void grantPaidCredits(int amount) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException(
+                    "충전 수량은 1 이상이어야 합니다."
+            );
+        }
+
+        this.paidAvailable = Math.addExact(
+                this.paidAvailable, amount
+        );
+    }
+
     // 무료 크레딧을 우선 사용하고, 없으면 유료 크레딧을 사용한다.
     public AiCreditBucket useOneCredit() {
 

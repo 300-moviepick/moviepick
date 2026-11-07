@@ -74,6 +74,17 @@ public class Payment extends BaseEntity {
         return payment;
     }
 
+    // AI 크레딧 구매. 금액은 서버 가격표(AiCreditProduct) 값만 넘긴다
+    public static Payment createCredit(Member member, long amount, String paymentId) {
+        Payment payment = new Payment();
+        payment.member = member;
+        payment.productType = ProductType.AI_CREDIT;
+        payment.amount = amount;
+        payment.paymentId = paymentId;
+        payment.status = PaymentStatus.CREATED;
+        return payment;
+    }
+
     public boolean isOwnedBy(Long memberId) {
         return member.getId().equals(memberId);
     }
