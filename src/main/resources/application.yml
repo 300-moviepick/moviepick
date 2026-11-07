@@ -2,20 +2,27 @@ spring:
   # Spring AI
   ai:
     model:
+      # 기본값은 둘 다 none(외부 AI 호출 없음). 켤 때만 openai로 지정한다
       chat: ${AI_CHAT_PROVIDER:none}
-      embedding: ${AI_EMBEDDING_PROVIDER:openai}
+      embedding: ${AI_EMBEDDING_PROVIDER:none}
       image: none
       moderation: none
     # OpenAI - GPT 추천 이유 생성 + 영화 임베딩
+    # timeout·max-retries는 채팅과 임베딩에 각각 적용된다 (Spring AI 2.0.2 OpenAiChatProperties·OpenAiEmbeddingProperties)
     openai:
       api-key: ${OPENAI_API_KEY:}
-      # GPT 추천 이유 생성
+      # GPT 추천 이유 생성 (후보 3편 × 이유 200자 이내 JSON 기준 약 650토큰 + 여유)
       chat:
         model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
+        max-completion-tokens: ${OPENAI_CHAT_MAX_COMPLETION_TOKENS:1000}
+        timeout: ${OPENAI_CHAT_TIMEOUT:15s}
+        max-retries: ${OPENAI_CHAT_MAX_RETRIES:0}
       # 영화 및 사용자 요청 임베딩
       embedding:
         model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
         dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:768}
+        timeout: ${OPENAI_EMBEDDING_TIMEOUT:15s}
+        max-retries: ${OPENAI_EMBEDDING_MAX_RETRIES:0}
   profiles:
     active: local
   # 프로젝트 맨 위의 .env를 설정으로 읽는다 (없으면 무시). docker compose와 같은 파일
@@ -82,6 +89,9 @@ app:
   frontend:
     url: ${APP_FRONTEND_URL:http://localhost:5173}
     allowed-origins: ${APP_FRONTEND_ALLOWED_ORIGINS:http://localhost:5173}
+  # refreshToken 쿠키의 Secure 속성. 로컬 HTTP는 false, HTTPS 운영은 true
+  cookie:
+    secure: ${APP_COOKIE_SECURE:false}
 tmdb:
   access-token: ${TMDB_ACCESS_TOKEN}
 movie:
