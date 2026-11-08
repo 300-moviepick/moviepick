@@ -132,7 +132,7 @@ class AiHybridRankingScoreServiceTest {
                 "우주 영화",
                 candidates
         )).willThrow(
-                new IllegalStateException("Ollama 연결 실패")
+                new IllegalStateException("임베딩 API 연결 실패")
         );
 
         var hybrid = service.compose(

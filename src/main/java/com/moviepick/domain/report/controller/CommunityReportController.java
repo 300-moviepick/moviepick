@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.report.controller;
 
 import com.moviepick.domain.report.dto.request.CommunityReportRequest;

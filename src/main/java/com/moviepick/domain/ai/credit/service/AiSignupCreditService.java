@@ -6,7 +6,6 @@ import com.moviepick.domain.ai.credit.repository.AiCreditTransactionRepository;
 import com.moviepick.domain.ai.credit.repository.AiCreditWalletRepository;
 import com.moviepick.domain.member.entity.Member;
 
-// [변경 ①] 회원 도메인의 Port 인터페이스
 import com.moviepick.domain.member.service.port.SignupBenefitPort;
 
 import java.util.Objects;
@@ -24,7 +23,7 @@ public class AiSignupCreditService implements SignupBenefitPort {
     private final AiCreditWalletRepository walletRepository;
     private final AiCreditTransactionRepository transactionRepository;
 
-    // [변경 ②] Port 구현, 회원가입 트랜잭션에 참여
+    // 회원 도메인의 SignupBenefitPort 구현. 회원가입 트랜잭션에 참여한다
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void grantTo(Member savedMember) {

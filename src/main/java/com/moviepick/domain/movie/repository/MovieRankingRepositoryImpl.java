@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -49,9 +50,8 @@ public class MovieRankingRepositoryImpl implements MovieRankingRepository {
 
         BigDecimal totalRatingSum = aggregate == null
                 ? BigDecimal.ZERO
-                : java.util.Optional.ofNullable(
-                aggregate.get(totalRatingSumExpression)
-        ).orElse(BigDecimal.ZERO);
+                : Optional.ofNullable(aggregate.get(totalRatingSumExpression))
+                        .orElse(BigDecimal.ZERO);
 
         Long totalReviewCount = aggregate == null
                 ? 0L

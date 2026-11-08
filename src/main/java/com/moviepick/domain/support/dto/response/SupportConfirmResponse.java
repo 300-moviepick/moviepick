@@ -1,6 +1,7 @@
 package com.moviepick.domain.support.dto.response;
 
-import com.moviepick.domain.support.entity.PaymentStatus;
+import com.moviepick.domain.payment.dto.response.ConfirmResult;
+import com.moviepick.domain.payment.entity.PaymentStatus;
 
 /**
  * 결제 확인 응답.

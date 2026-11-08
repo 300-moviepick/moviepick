@@ -1,6 +1,6 @@
 package com.moviepick.domain.ai.credit.entity;
 
-import com.moviepick.domain.support.entity.Payment;
+import com.moviepick.domain.payment.entity.Payment;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -136,51 +136,47 @@ public class AiCreditTransaction {
         );
     }
 
-    // 추천 요청 선차감 기록
+    // AI 추천 요청 선차감 기록 (-1)
     public static AiCreditTransaction use(
             AiCreditWallet wallet,
-            String requestKey,
             AiCreditBucket bucket,
-            String key
+            String requestKey,
+            String idempotencyKey
     ) {
         requireRequestKey(requestKey);
 
         return new AiCreditTransaction(
                 wallet, null, requestKey,
                 AiCreditEventType.USE,
-                bucket, -1, key
+                bucket, -1, idempotencyKey
         );
     }
 
-    // 추천 완료 기록
+    // AI 추천 성공 확정 기록 (잔액 변화 0). 원래 USE와 같은 지갑·요청·크레딧 종류로 남긴다
     public static AiCreditTransaction complete(
-            AiCreditWallet wallet,
-            String requestKey,
-            AiCreditBucket bucket,
-            String key
+            AiCreditTransaction originalUse,
+            String idempotencyKey
     ) {
-        requireRequestKey(requestKey);
+        requireUse(originalUse, "USE 거래만 완료할 수 있습니다.");
 
         return new AiCreditTransaction(
-                wallet, null, requestKey,
+                originalUse.getWallet(), null, originalUse.getRequestKey(),
                 AiCreditEventType.COMPLETE,
-                bucket, 0, key
+                originalUse.getBucket(), 0, idempotencyKey
         );
     }
 
-    // 추천 실패 복구 기록
+    // AI 추천 실패 복구 기록 (+1). 원래 USE와 같은 크레딧 종류로 되돌린다
     public static AiCreditTransaction restore(
-            AiCreditWallet wallet,
-            String requestKey,
-            AiCreditBucket bucket,
-            String key
+            AiCreditTransaction originalUse,
+            String idempotencyKey
     ) {
-        requireRequestKey(requestKey);
+        requireUse(originalUse, "USE 거래만 복구할 수 있습니다.");
 
         return new AiCreditTransaction(
-                wallet, null, requestKey,
+                originalUse.getWallet(), null, originalUse.getRequestKey(),
                 AiCreditEventType.RESTORE,
-                bucket, 1, key
+                originalUse.getBucket(), 1, idempotencyKey
         );
     }
 
@@ -196,64 +192,9 @@ public class AiCreditTransaction {
         }
     }
 
-    // AI 추천 크레딧 1회 사용 원장 생성
-    public static AiCreditTransaction use(
-            AiCreditWallet wallet,
-            AiCreditBucket bucket,
-            String requestKey,
-            String idempotencyKey
-    ) {
-        AiCreditTransaction transaction = new AiCreditTransaction();
-
-        transaction.wallet = wallet;
-        transaction.requestKey = requestKey;
-        transaction.eventType = AiCreditEventType.USE;
-        transaction.bucket = bucket;
-        transaction.delta = -1;
-        transaction.idempotencyKey = idempotencyKey;
-
-        return transaction;
-    }
-
-    // [추가] 기존 USE 거래를 기준으로 복구 원장 생성
-    public static AiCreditTransaction restore(
-            AiCreditTransaction originalUse,
-            String idempotencyKey
-    ) {
+    private static void requireUse(AiCreditTransaction originalUse, String message) {
         if (originalUse.getEventType() != AiCreditEventType.USE) {
-            throw new IllegalArgumentException("USE 거래만 복구할 수 있습니다.");
+            throw new IllegalArgumentException(message);
         }
-
-        AiCreditTransaction transaction = new AiCreditTransaction();
-
-        transaction.wallet = originalUse.getWallet();
-        transaction.requestKey = originalUse.getRequestKey();
-        transaction.eventType = AiCreditEventType.RESTORE;
-        transaction.bucket = originalUse.getBucket();
-        transaction.delta = 1;
-        transaction.idempotencyKey = idempotencyKey;
-
-        return transaction;
-    }
-
-    // [추가] AI 추천 성공 확정 거래 생성
-    public static AiCreditTransaction complete(
-            AiCreditTransaction originalUse,
-            String idempotencyKey
-    ) {
-        if (originalUse.getEventType() != AiCreditEventType.USE) {
-            throw new IllegalArgumentException("USE 거래만 완료할 수 있습니다.");
-        }
-
-        AiCreditTransaction transaction = new AiCreditTransaction();
-
-        transaction.wallet = originalUse.getWallet();
-        transaction.requestKey = originalUse.getRequestKey();
-        transaction.eventType = AiCreditEventType.COMPLETE;
-        transaction.bucket = originalUse.getBucket();
-        transaction.delta = 0;
-        transaction.idempotencyKey = idempotencyKey;
-
-        return transaction;
     }
 }

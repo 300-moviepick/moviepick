@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.movie.service;
 
 import lombok.RequiredArgsConstructor;

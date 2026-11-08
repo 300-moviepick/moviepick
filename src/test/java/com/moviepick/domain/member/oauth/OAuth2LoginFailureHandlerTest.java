@@ -6,6 +6,7 @@ import com.moviepick.domain.member.entity.MemberStatus;
 import com.moviepick.domain.member.repository.MemberRepository;
 import com.moviepick.global.config.FrontendProperties;
 import com.moviepick.global.security.JwtProvider;
+import com.moviepick.global.security.RefreshTokenCookieFactory;
 import com.moviepick.global.security.RefreshTokenService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -71,7 +72,8 @@ class OAuth2LoginFailureHandlerTest {
     void successHandler_suspendedMember_redirectsToFail() throws Exception {
         MemberRepository memberRepository = mock(MemberRepository.class);
         OAuth2LoginSuccessHandler successHandler = new OAuth2LoginSuccessHandler(
-                memberRepository, mock(JwtProvider.class), mock(RefreshTokenService.class), frontendProperties);
+                memberRepository, mock(JwtProvider.class), mock(RefreshTokenService.class), frontendProperties,
+                new RefreshTokenCookieFactory(false));
 
         Member member = Member.createSocial(AuthProvider.KAKAO, "123", null, "카카오회원");
         member.suspend(null);

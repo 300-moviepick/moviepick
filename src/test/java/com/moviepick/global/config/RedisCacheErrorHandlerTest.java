@@ -1,4 +1,3 @@
-
 package com.moviepick.global.config;
 
 import static org.mockito.Mockito.mock;

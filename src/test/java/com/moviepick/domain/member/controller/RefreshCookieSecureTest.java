@@ -1,5 +1,6 @@
 package com.moviepick.domain.member.controller;
 
+import com.moviepick.global.security.RefreshTokenCookieFactory;
 import com.moviepick.domain.member.dto.response.LoginResponse;
 import com.moviepick.domain.member.dto.response.LoginResult;
 import com.moviepick.domain.member.entity.Role;
@@ -44,6 +45,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         }
 )
 @Import({
+        RefreshTokenCookieFactory.class,
         SecurityConfig.class,
         CustomAuthenticationEntryPoint.class,
         CustomAccessDeniedHandler.class,
@@ -99,14 +101,14 @@ class RefreshCookieSecureTest {
 
             assertThat(cookie).startsWith("refreshToken=refresh-token");
             assertThat(cookie).doesNotContain("Secure");
-            assertThat(cookie).contains("SameSite=Strict", "HttpOnly");
+            assertThat(cookie).contains("SameSite=Strict", "HttpOnly", "Path=/api/auth", "Max-Age=1209600");
         }
 
         @Test
         void 로그아웃_쿠키에_Secure가_없다() throws Exception {
             assertThat(logoutCookie())
                     .doesNotContain("Secure")
-                    .contains("Max-Age=0", "SameSite=Strict");
+                    .contains("Max-Age=0", "SameSite=Strict", "HttpOnly", "Path=/api/auth");
         }
     }
 

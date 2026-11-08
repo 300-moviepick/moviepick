@@ -1,5 +1,6 @@
 package com.moviepick.domain.ai.credit.service;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.dto.request.AiCreditPurchaseRequest;
 import com.moviepick.domain.ai.credit.entity.AiCreditBucket;
 import com.moviepick.domain.ai.credit.entity.AiCreditEventType;
@@ -10,24 +11,23 @@ import com.moviepick.domain.ai.credit.repository.AiCreditWalletRepository;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.repository.MemberRepository;
 import com.moviepick.domain.member.service.MemberService;
-import com.moviepick.domain.support.client.PortOneClient;
-import com.moviepick.domain.support.client.PortOnePayment;
-import com.moviepick.domain.support.client.PortOneProperties;
-import com.moviepick.domain.support.client.webhook.PortOneWebhookEvent;
-import com.moviepick.domain.support.client.webhook.PortOneWebhookReceiver;
-import com.moviepick.domain.support.client.webhook.PortOneWebhookVerifier;
-import com.moviepick.domain.support.dto.response.ConfirmResult;
-import com.moviepick.domain.support.entity.Payment;
-import com.moviepick.domain.support.entity.PaymentStatus;
-import com.moviepick.domain.support.entity.ProductType;
+import com.moviepick.domain.payment.client.PortOneClient;
+import com.moviepick.domain.payment.client.PortOnePayment;
+import com.moviepick.domain.payment.client.PortOneProperties;
+import com.moviepick.domain.payment.client.webhook.PortOneWebhookEvent;
+import com.moviepick.domain.payment.client.webhook.PortOneWebhookReceiver;
+import com.moviepick.domain.payment.client.webhook.PortOneWebhookVerifier;
+import com.moviepick.domain.payment.dto.response.ConfirmResult;
+import com.moviepick.domain.payment.entity.Payment;
+import com.moviepick.domain.payment.entity.PaymentStatus;
+import com.moviepick.domain.payment.entity.ProductType;
 import com.moviepick.domain.support.exception.SupportErrorCode;
-import com.moviepick.domain.support.repository.PaymentRepository;
+import com.moviepick.domain.payment.repository.PaymentRepository;
 import com.moviepick.domain.support.service.SupportService;
-import com.moviepick.domain.support.service.SupportWebhookResult;
-import com.moviepick.domain.support.service.SupportWebhookService;
+import com.moviepick.domain.payment.service.SupportWebhookResult;
+import com.moviepick.domain.payment.service.SupportWebhookService;
 import com.moviepick.global.config.JpaAuditingConfig;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import com.moviepick.global.exception.ErrorCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -156,7 +156,7 @@ class AiCreditPurchaseServiceIntegrationTest {
     void 알_수_없는_상품_코드는_거부한다() {
         assertThatThrownBy(() -> purchaseService.createPurchase(
                 member.getId(), new AiCreditPurchaseRequest("CREDIT_99")))
-                .satisfies(e -> assertErrorCode(e, CommonErrorCode.AI_CREDIT_PRODUCT_NOT_FOUND));
+                .satisfies(e -> assertErrorCode(e, AiErrorCode.AI_CREDIT_PRODUCT_NOT_FOUND));
 
         assertThat(paymentRepository.count()).isZero();
     }
@@ -226,7 +226,7 @@ class AiCreditPurchaseServiceIntegrationTest {
         String paymentId = create("CREDIT_10");
 
         assertThatThrownBy(() -> purchaseService.confirm(other.getId(), paymentId))
-                .satisfies(e -> assertErrorCode(e, CommonErrorCode.NOT_AI_CREDIT_PURCHASE_OWNER));
+                .satisfies(e -> assertErrorCode(e, AiErrorCode.NOT_AI_CREDIT_PURCHASE_OWNER));
 
         assertThat(purchases()).isEmpty();
     }
@@ -252,7 +252,7 @@ class AiCreditPurchaseServiceIntegrationTest {
         String creditPaymentId = create("CREDIT_10");
 
         assertThatThrownBy(() -> purchaseService.confirm(member.getId(), supportPaymentId))
-                .satisfies(e -> assertErrorCode(e, CommonErrorCode.AI_CREDIT_PURCHASE_NOT_FOUND));
+                .satisfies(e -> assertErrorCode(e, AiErrorCode.AI_CREDIT_PURCHASE_NOT_FOUND));
 
         assertThatThrownBy(() -> supportService.confirm(member.getId(), creditPaymentId))
                 .satisfies(e -> assertErrorCode(e, SupportErrorCode.SUPPORT_NOT_FOUND));

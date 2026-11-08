@@ -10,7 +10,6 @@ import com.moviepick.domain.ai.credit.service.AiSignupCreditService;
 import com.moviepick.domain.member.dto.request.MemberUpdateRequest;
 import com.moviepick.domain.member.dto.request.SignupRequest;
 import com.moviepick.domain.member.dto.response.MemberResponse;
-import com.moviepick.domain.member.exception.MemberErrorCode;
 import com.moviepick.domain.member.repository.MemberRepository;
 import com.moviepick.global.security.JwtProvider;
 import com.moviepick.global.security.RefreshTokenService;
@@ -47,7 +46,7 @@ class MemberNicknameDuplicateTest {
     private JwtProvider jwtProvider;
     @MockitoBean
     private RefreshTokenService refreshTokenService;
-    // [AI 추가] 기존 회원 도메인 테스트에서 무료 지급 호출 대체
+    // 회원가입 혜택(AI 크레딧 지급)은 이 테스트의 범위 밖이라 mock으로 대체
     @MockitoBean
     private AiSignupCreditService aiSignupCreditService;
 
@@ -84,6 +83,27 @@ class MemberNicknameDuplicateTest {
         MemberResponse response = memberService.updateMember(memberId, new MemberUpdateRequest("내이름"));
 
         assertThat(response.nickname()).isEqualTo("내이름");
+    }
+
+    @Test
+    @DisplayName("수정: 가입과 같이 앞뒤 공백을 제거해 저장한다 (R8)")
+    void updateTrimsNickname() {
+        Long memberId = signup("me@test.com", "내이름").memberId();
+
+        MemberResponse response = memberService.updateMember(memberId, new MemberUpdateRequest("  새이름  "));
+
+        assertThat(response.nickname()).isEqualTo("새이름");
+        assertThat(memberRepository.findById(memberId).orElseThrow().getNickname()).isEqualTo("새이름");
+    }
+
+    @Test
+    @DisplayName("수정: 앞뒤 공백만 다른 다른 회원의 닉네임이면 409 DUPLICATE_NICKNAME (R8)")
+    void updateTrimmedDuplicateNickname() {
+        signup("first@test.com", "먼저쓴이름");
+        Long memberId = signup("second@test.com", "내이름").memberId();
+
+        assertDuplicateNickname(() -> memberService.updateMember(memberId, new MemberUpdateRequest(" 먼저쓴이름 ")));
+        assertThat(memberRepository.findById(memberId).orElseThrow().getNickname()).isEqualTo("내이름");
     }
 
     @Test

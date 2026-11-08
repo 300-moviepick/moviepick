@@ -36,7 +36,7 @@ class SocialNicknameNumberTest {
     private SocialMemberRegistrar socialMemberRegistrar;
     @MockitoSpyBean
     private MemberRepository memberRepository;
-    // [AI 추가] 기존 회원 도메인 테스트에서 무료 지급 호출 대체
+    // 회원가입 혜택(AI 크레딧 지급)은 이 테스트의 범위 밖이라 mock으로 대체
     @MockitoBean
     private AiSignupCreditService aiSignupCreditService;
 

@@ -35,7 +35,7 @@ public class ReviewLikeService {
             throw new BusinessException(ReviewErrorCode.CANNOT_LIKE_OWN_REVIEW);
         }
 
-        Member member = memberService.getMember(memberId);   // [수정] getActiveMember → getMember
+        Member member = memberService.getMember(memberId);
 
         // 좋아요 수는 review_likes 집계라서 insert 한 번이면 끝난다 (따로 올릴 카운터 없음)
         try {

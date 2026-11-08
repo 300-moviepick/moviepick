@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.community.service;
 
 import com.moviepick.domain.community.dto.response.PostLikeResponse;
@@ -88,13 +87,7 @@ public class PostLikeService {
         return new PostLikeResponse(false, likeCount);
     }
 
-    // 게시글 좋아요 수 조회
-    public long getLikeCount(Long postId) {
-        findVisiblePost(postId);
-        return postLikeRepository.countByPostId(postId);
-    }
-
-    // 게시글 상태와 관계없이 좋아요 수 조회 (관리자의 숨긴 글 상세용)
+    // 게시글 좋아요 수 조회. 게시글 상태는 확인하지 않으므로 호출하는 쪽에서 확인한다 (상세 조회, 관리자의 숨긴 글 상세)
     public long countLikes(Long postId) {
         return postLikeRepository.countByPostId(postId);
     }

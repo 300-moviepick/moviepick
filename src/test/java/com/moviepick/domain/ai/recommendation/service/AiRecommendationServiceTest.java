@@ -1,5 +1,6 @@
 package com.moviepick.domain.ai.recommendation.service;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.entity.AiCreditBucket;
 import com.moviepick.domain.ai.credit.service.AiCreditCompleteService;
 import com.moviepick.domain.ai.credit.service.AiCreditRestoreService;
@@ -10,7 +11,6 @@ import com.moviepick.domain.ai.recommendation.dto.AiMovieReason;
 import com.moviepick.domain.ai.recommendation.dto.AiRecommendRequest;
 import com.moviepick.domain.ai.recommendation.dto.AiRecommendedMovie;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,7 +58,7 @@ class AiRecommendationServiceTest {
     @Mock
     private AiFeedbackRankingService feedbackRankingService;
 
-    // [추가] 하이브리드 랭킹 Mock
+    // 하이브리드 랭킹 Mock
     @Mock
     private AiHybridRankingScoreService hybridRankingScoreService;
 
@@ -80,7 +80,7 @@ class AiRecommendationServiceTest {
     @InjectMocks
     private AiRecommendationService recommendationService;
 
-    // [추가] 기존 개인화 점수 함수를 그대로 반환
+    // 기존 개인화 점수 함수를 그대로 반환
     @BeforeEach
     void setUpHybridRanking() {
         lenient().when(hybridRankingScoreService.compose(
@@ -241,7 +241,7 @@ class AiRecommendationServiceTest {
         ).isInstanceOfSatisfying(
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode()).isEqualTo(
-                        CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
+                        AiErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
                 )
         );
 
@@ -275,7 +275,7 @@ class AiRecommendationServiceTest {
         ).isInstanceOfSatisfying(
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode()).isEqualTo(
-                        CommonErrorCode.AI_RECOMMENDATION_IN_PROGRESS
+                        AiErrorCode.AI_RECOMMENDATION_IN_PROGRESS
                 )
         );
 
@@ -299,14 +299,14 @@ class AiRecommendationServiceTest {
         )).willReturn(successfulSpend());
 
         given(reasonGenerator.generate(PROMPT, candidates()))
-                .willThrow(new IllegalStateException("Ollama 호출 실패"));
+                .willThrow(new IllegalStateException("LLM API 호출 실패"));
 
         assertThatThrownBy(() ->
                 recommendationService.recommend(MEMBER_ID, request())
         ).isInstanceOfSatisfying(
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode()).isEqualTo(
-                        CommonErrorCode.AI_RECOMMENDATION_FAILED
+                        AiErrorCode.AI_RECOMMENDATION_FAILED
                 )
         );
 
@@ -524,7 +524,7 @@ class AiRecommendationServiceTest {
         ).isInstanceOfSatisfying(
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode()).isEqualTo(
-                        CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
+                        AiErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
                 )
         );
 
@@ -605,7 +605,7 @@ class AiRecommendationServiceTest {
         given(spendService.spendOne(
                 MEMBER_ID, REQUEST_KEY.toString()
         )).willThrow(new BusinessException(
-                CommonErrorCode.AI_CREDIT_INSUFFICIENT
+                AiErrorCode.AI_CREDIT_INSUFFICIENT
         ));
 
         assertThatThrownBy(() ->
@@ -613,7 +613,7 @@ class AiRecommendationServiceTest {
         ).isInstanceOfSatisfying(
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode()).isEqualTo(
-                        CommonErrorCode.AI_CREDIT_INSUFFICIENT
+                        AiErrorCode.AI_CREDIT_INSUFFICIENT
                 )
         );
 
@@ -651,7 +651,7 @@ class AiRecommendationServiceTest {
         ).isInstanceOfSatisfying(
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode()).isEqualTo(
-                        CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
+                        AiErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
                 )
         );
 

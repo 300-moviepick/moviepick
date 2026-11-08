@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.ai.credit.entity;
 
 import com.moviepick.domain.member.entity.Member;
@@ -39,13 +38,7 @@ class AiCreditTransactionTest {
         AiCreditWallet wallet = createWallet();
         String requestKey = UUID.randomUUID().toString();
 
-        AiCreditTransaction transaction =
-                AiCreditTransaction.use(
-                        wallet,
-                        requestKey,
-                        AiCreditBucket.FREE,
-                        "AI:USE:10:" + requestKey
-                );
+        AiCreditTransaction transaction = use(wallet, requestKey);
 
         assertEquals(AiCreditEventType.USE, transaction.getEventType());
         assertEquals(-1, transaction.getDelta());
@@ -53,37 +46,51 @@ class AiCreditTransactionTest {
     }
 
     @Test
-    void 추천_성공시_잔액_변화는_0이다() {
+    void 추천_성공시_잔액_변화는_0이고_사용과_같은_요청을_가리킨다() {
         AiCreditWallet wallet = createWallet();
         String requestKey = UUID.randomUUID().toString();
+        AiCreditTransaction originalUse = use(wallet, requestKey);
 
         AiCreditTransaction transaction =
-                AiCreditTransaction.complete(
-                        wallet,
-                        requestKey,
-                        AiCreditBucket.FREE,
-                        "AI:FINAL:10:" + requestKey
-                );
+                AiCreditTransaction.complete(originalUse, "COMPLETE:MEMBER:10:REQ:" + requestKey);
 
         assertEquals(AiCreditEventType.COMPLETE, transaction.getEventType());
         assertEquals(0, transaction.getDelta());
+        assertEquals(requestKey, transaction.getRequestKey());
+        assertEquals(AiCreditBucket.FREE, transaction.getBucket());
+        assertSame(wallet, transaction.getWallet());
     }
 
     @Test
     void 추천_실패시_플러스_1을_기록한다() {
         AiCreditWallet wallet = createWallet();
         String requestKey = UUID.randomUUID().toString();
+        AiCreditTransaction originalUse = use(wallet, requestKey);
 
         AiCreditTransaction transaction =
-                AiCreditTransaction.restore(
-                        wallet,
-                        requestKey,
-                        AiCreditBucket.FREE,
-                        "AI:FINAL:10:" + requestKey
-                );
+                AiCreditTransaction.restore(originalUse, "RESTORE:MEMBER:10:REQ:" + requestKey);
 
         assertEquals(AiCreditEventType.RESTORE, transaction.getEventType());
         assertEquals(1, transaction.getDelta());
+        assertEquals(AiCreditBucket.FREE, transaction.getBucket());
+    }
+
+    @Test
+    void USE가_아닌_거래는_완료나_복구할_수_없다() {
+        AiCreditTransaction grant = AiCreditTransaction.freeGrant(createWallet(), 3, "FREE_GRANT:MEMBER:10");
+
+        assertThrows(IllegalArgumentException.class, () -> AiCreditTransaction.complete(grant, "COMPLETE:X"));
+        assertThrows(IllegalArgumentException.class, () -> AiCreditTransaction.restore(grant, "RESTORE:X"));
+    }
+
+    @Test
+    void 요청_키가_UUID_길이가_아니거나_멱등_키가_비면_사용_기록을_거부한다() {
+        AiCreditWallet wallet = createWallet();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> AiCreditTransaction.use(wallet, AiCreditBucket.FREE, "short", "USE:MEMBER:10:REQ:short"));
+        assertThrows(IllegalArgumentException.class,
+                () -> AiCreditTransaction.use(wallet, AiCreditBucket.FREE, UUID.randomUUID().toString(), " "));
     }
 
     @Test
@@ -94,5 +101,9 @@ class AiCreditTransactionTest {
                 IllegalArgumentException.class,
                 () -> AiCreditTransaction.freeGrant(wallet, 0, "TEST:GRANT")
         );
+    }
+
+    private AiCreditTransaction use(AiCreditWallet wallet, String requestKey) {
+        return AiCreditTransaction.use(wallet, AiCreditBucket.FREE, requestKey, "USE:MEMBER:10:REQ:" + requestKey);
     }
 }

@@ -1,6 +1,6 @@
 package com.moviepick.domain.support.dto.response;
 
-import com.moviepick.domain.support.entity.Payment;
+import com.moviepick.domain.payment.entity.Payment;
 
 /**
  * 후원 생성 응답. 프론트는 이 값으로 PortOne 결제창(SDK requestPayment)을 연다.

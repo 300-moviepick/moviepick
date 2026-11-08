@@ -2,6 +2,7 @@ package com.moviepick.domain.member.dto.response;
 
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.entity.Role;
+import com.moviepick.global.security.JwtProvider;
 
 public record LoginResponse(
         Long memberId,
@@ -22,7 +23,7 @@ public record LoginResponse(
                 member.getRole(),
                 accessToken,
                 "Bearer",
-                1800
+                (int) JwtProvider.ACCESS_TOKEN_TTL.toSeconds()
         );
     }
 }

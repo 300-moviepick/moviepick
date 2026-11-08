@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.movie.client.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;

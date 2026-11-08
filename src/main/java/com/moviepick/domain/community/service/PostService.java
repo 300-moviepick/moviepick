@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.community.service;
 
 import com.moviepick.domain.community.dto.request.PostCreateRequest;
@@ -158,8 +157,8 @@ public class PostService {
                 .orElseThrow(() ->
                         new BusinessException(PostErrorCode.POST_NOT_FOUND));
 
-        // 좋아요 수 조회
-        long likeCount = postLikeService.getLikeCount(postId);
+        // 좋아요 수 조회 (공개 글인지는 위에서 이미 확인했다)
+        long likeCount = postLikeService.countLikes(postId);
 
         // 비로그인 사용자는 좋아요 여부를 false로 처리
         boolean likedByMe = memberId != null

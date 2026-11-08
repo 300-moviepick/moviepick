@@ -27,8 +27,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-web'
-	// 인증·인가 (인증 파트: SecurityConfig와 같은 PR에서 반영)
+	// 인증·인가 (JWT + 카카오·구글 OAuth2 로그인)
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
 
@@ -40,19 +39,11 @@ dependencies {
 	// Spring Batch + JDBC 실행 이력 관리
 	implementation 'org.springframework.boot:spring-boot-starter-batch-jdbc'
 
-	// Refresh Token을 Redis에 저장하기로 한 경우에만
+	// Redis: Refresh Token 저장, 캐시
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
 	// Spring Cache
 	implementation 'org.springframework.boot:spring-boot-starter-cache'
-
-	// 마이그레이션 도구를 쓰기로 한 경우에만 (MySQL은 flyway-mysql 필요)
-	// implementation 'org.springframework.boot:spring-boot-starter-flyway'
-	// implementation 'org.flywaydb:flyway-mysql'
-
-	// 선택
-	// implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.0'   // Boot 4용 3.x 최신 버전 확인
-	// implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
 	// DB·유틸
 	runtimeOnly 'com.mysql:mysql-connector-j'
@@ -65,7 +56,7 @@ dependencies {
 	annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
 	annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
 
-	// 테스트.
+	// 테스트
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
@@ -73,11 +64,9 @@ dependencies {
 	// 패키지 의존 규칙 검사 (BOM 관리 대상이 아니라 버전을 직접 지정)
 	testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.1'
 
-	// [AI 수정] H2 2.4.240 CHECK 제약조건 버그 대응
+	// H2 2.4.240의 CHECK 제약조건 버그를 피하려고 버전을 직접 지정
 	testRuntimeOnly 'com.h2database:h2:2.5.252'
 
-	testCompileOnly 'org.projectlombok:lombok'
-	testAnnotationProcessor 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 

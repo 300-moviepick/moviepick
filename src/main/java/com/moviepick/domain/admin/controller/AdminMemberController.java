@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.admin.controller;
 
 import com.moviepick.domain.member.dto.response.MemberResponse;

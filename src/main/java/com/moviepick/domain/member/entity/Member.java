@@ -1,6 +1,8 @@
 package com.moviepick.domain.member.entity;
 
+import com.moviepick.domain.member.exception.MemberErrorCode;
 import com.moviepick.global.entity.BaseEntity;
+import com.moviepick.global.exception.BusinessException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -175,4 +177,16 @@ public class Member extends BaseEntity {
         return false;
     }
 
+    // 로그인·토큰 재발급·인증 요청 공통: 만료된 정지는 먼저 해제하고, 그래도 정지·탈퇴 상태면 403
+    public void releaseExpiredSuspensionAndRequireActive() {
+        releaseSuspensionIfExpired();
+
+        if (this.status == MemberStatus.SUSPENDED) {
+            throw new BusinessException(MemberErrorCode.MEMBER_SUSPENDED);
+        }
+
+        if (this.status == MemberStatus.WITHDRAWN) {
+            throw new BusinessException(MemberErrorCode.MEMBER_WITHDRAWN);
+        }
+    }
 }

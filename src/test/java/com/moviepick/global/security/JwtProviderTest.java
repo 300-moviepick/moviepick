@@ -1,4 +1,3 @@
-
 package com.moviepick.global.security;
 
 import org.junit.jupiter.api.Test;

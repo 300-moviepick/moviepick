@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.community.exception;
 
 import com.moviepick.global.exception.ErrorCode;

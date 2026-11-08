@@ -6,12 +6,12 @@ import com.moviepick.domain.member.entity.MemberStatus;
 import com.moviepick.domain.member.repository.MemberRepository;
 import com.moviepick.global.config.FrontendProperties;
 import com.moviepick.global.security.JwtProvider;
+import com.moviepick.global.security.RefreshTokenCookieFactory;
 import com.moviepick.global.security.RefreshTokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
@@ -31,10 +31,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final JwtProvider jwtProvider;
     private final RefreshTokenService refreshTokenService;
     private final FrontendProperties frontendProperties;
-
-    // refreshToken 쿠키 Secure 속성 (app.cookie.secure, 로컬 기본 false)
-    @Value("${app.cookie.secure:false}")
-    private boolean secureCookie;
+    private final RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     @Override
     public void onAuthenticationSuccess(
@@ -124,14 +121,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         );
 
         // 7. Refresh Token을 HttpOnly 쿠키로 발급
-        ResponseCookie cookie = ResponseCookie
-                .from("refreshToken", refreshToken)
-                .httpOnly(true)
-                .secure(secureCookie)
-                .sameSite("Strict")
-                .path("/api/auth")
-                .maxAge(14 * 24 * 60 * 60)
-                .build();
+        ResponseCookie cookie = refreshTokenCookieFactory.create(refreshToken);
 
         response.addHeader(
                 HttpHeaders.SET_COOKIE,

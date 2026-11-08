@@ -41,6 +41,11 @@ public record ApiResponse<T>(
         return new ApiResponse<>(false, errorCode.getStatus().value(), message, null, nameOf(errorCode));
     }
 
+    // 오류 응답에도 결과 데이터를 함께 보내야 하는 경우 (예: 실패한 배치 실행 정보)
+    public static <T> ApiResponse<T> errorWithData(ErrorCode errorCode, T data) {
+        return new ApiResponse<>(false, errorCode.getStatus().value(), errorCode.getMessage(), data, nameOf(errorCode));
+    }
+
     // enum 오류 코드가 없는 경우용
     public static <T> ApiResponse<T> error(HttpStatusCode status, String errorCode, String message) {
         return new ApiResponse<>(false, status.value(), message, null, errorCode);

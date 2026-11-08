@@ -6,6 +6,7 @@ import jakarta.persistence.LockModeType;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -34,14 +35,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query("select r from Review r where r.member.id = :memberId and r.movie.id = :movieId")
     Optional<Review> findByMemberIdAndMovieIdForUpdate(@Param("memberId") Long memberId,
                                                        @Param("movieId") Long movieId);
-
-    // 상태 전이 (조건부 UPDATE). 반영된 행이 1일 때만 평점 집계를 건드린다 → 중복 처리돼도 두 번 빠지지 않음
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("update Review r set r.status = :to, r.updatedAt = CURRENT_TIMESTAMP "
-            + "where r.id = :id and r.status = :from")
-    int changeStatus(@Param("id") Long id,
-                     @Param("from") ReviewStatus from,
-                     @Param("to") ReviewStatus to);
 
     // ===== 조회용 (N+1 방지: EntityGraph) =====
 
@@ -75,13 +68,14 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     boolean existsByIdAndStatus(Long id, ReviewStatus status);
 
-    // [수정] 추가: 영화 상세의 myReviewId 조회용 (VISIBLE 리뷰만)
+    // 영화 상세의 myReviewId 조회용 (VISIBLE 리뷰만)
     @Query("select r.id from Review r "
             + "where r.member.id = :memberId and r.movie.id = :movieId and r.status = :status")
     Optional<Long> findIdByMemberIdAndMovieIdAndStatus(@Param("memberId") Long memberId,
                                                        @Param("movieId") Long movieId,
                                                        @Param("status") ReviewStatus status);
 
+    // 상태 전이 (조건부 UPDATE). 반영된 행이 1일 때만 평점 집계를 건드린다 → 중복 처리돼도 두 번 빠지지 않음
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update Review r set r.status = :to, r.updatedAt = :now "
             + "where r.id = :id and r.status = :from")
@@ -89,4 +83,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                      @Param("from") ReviewStatus from,
                      @Param("to") ReviewStatus to,
                      @Param("now") LocalDateTime now);
+
+    // 관리자 신고 목록: 신고 대상 리뷰와 작성자를 한 번에 조회 (행마다 조회하는 N+1 방지)
+    @Query("select r from Review r join fetch r.member where r.id in :ids")
+    List<Review> findWithMemberByIdIn(@Param("ids") Collection<Long> ids);
 }

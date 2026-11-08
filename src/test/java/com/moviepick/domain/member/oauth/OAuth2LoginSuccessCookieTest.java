@@ -6,6 +6,7 @@ import com.moviepick.domain.member.entity.MemberStatus;
 import com.moviepick.domain.member.repository.MemberRepository;
 import com.moviepick.global.config.FrontendProperties;
 import com.moviepick.global.security.JwtProvider;
+import com.moviepick.global.security.RefreshTokenCookieFactory;
 import com.moviepick.global.security.RefreshTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -36,12 +36,7 @@ class OAuth2LoginSuccessCookieTest {
 
     @BeforeEach
     void setUp() {
-        handler = new OAuth2LoginSuccessHandler(
-                memberRepository,
-                jwtProvider,
-                refreshTokenService,
-                new FrontendProperties("http://localhost:5173", List.of())
-        );
+        handler = handlerWithSecureCookie(false);
 
         Member member = mock(Member.class);
         given(member.getId()).willReturn(7L);
@@ -51,6 +46,16 @@ class OAuth2LoginSuccessCookieTest {
                 .willReturn(Optional.of(member));
         given(refreshTokenService.getAuthVersion(7L)).willReturn(0L);
         given(jwtProvider.createRefreshToken(7L, 0L)).willReturn("refresh-token");
+    }
+
+    private OAuth2LoginSuccessHandler handlerWithSecureCookie(boolean secure) {
+        return new OAuth2LoginSuccessHandler(
+                memberRepository,
+                jwtProvider,
+                refreshTokenService,
+                new FrontendProperties("http://localhost:5173", List.of()),
+                new RefreshTokenCookieFactory(secure)
+        );
     }
 
     private String successCookie() throws Exception {
@@ -73,12 +78,12 @@ class OAuth2LoginSuccessCookieTest {
 
         assertThat(cookie).startsWith("refreshToken=refresh-token");
         assertThat(cookie).doesNotContain("Secure");
-        assertThat(cookie).contains("SameSite=Strict", "HttpOnly");
+        assertThat(cookie).contains("SameSite=Strict", "HttpOnly", "Path=/api/auth", "Max-Age=1209600");
     }
 
     @Test
     void 설정값이_true면_Secure가_붙는다() throws Exception {
-        ReflectionTestUtils.setField(handler, "secureCookie", true);
+        handler = handlerWithSecureCookie(true);
 
         assertThat(successCookie())
                 .contains("Secure", "SameSite=Strict", "HttpOnly");

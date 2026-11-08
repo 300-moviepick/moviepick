@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.movie.service;
 
 import com.moviepick.domain.movie.dto.response.MovieRankingResponse;
@@ -29,12 +28,7 @@ public class MovieRankingCacheService {
             int page,
             int size
     ) {
-        PageRequest pageable = PageRequest.of(page, size);
-
-        Page<MovieRankingResponse> rankingPage =
-                movieRankingRepository.findRanking(pageable);
-
-        return PageResponse.from(rankingPage);
+        return findRanking(page, size);
     }
 
     // Redis 캐시를 사용하지 않고 DB에서 직접 랭킹 조회
@@ -42,10 +36,12 @@ public class MovieRankingCacheService {
             int page,
             int size
     ) {
-        PageRequest pageable = PageRequest.of(page, size);
+        return findRanking(page, size);
+    }
 
+    private PageResponse<MovieRankingResponse> findRanking(int page, int size) {
         Page<MovieRankingResponse> rankingPage =
-                movieRankingRepository.findRanking(pageable);
+                movieRankingRepository.findRanking(PageRequest.of(page, size));
 
         return PageResponse.from(rankingPage);
     }

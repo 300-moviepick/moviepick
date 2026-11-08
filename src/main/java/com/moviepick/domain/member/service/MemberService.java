@@ -38,28 +38,16 @@ public class MemberService {
                         )
                 );
 
-        // 2. 정지 기간이 만료되었다면 자동 해제
-        member.releaseSuspensionIfExpired();
+        // 2. 만료된 정지는 해제하고, 정지·탈퇴 회원은 접근 차단 (403)
+        member.releaseExpiredSuspensionAndRequireActive();
 
-        // 3. 정지된 회원은 접근 차단 (403)
-        if (member.getStatus() == MemberStatus.SUSPENDED) {
-            throw new BusinessException(
-                    MemberErrorCode.MEMBER_SUSPENDED
-            );
-        }
-
-        // 4. 탈퇴한 회원은 접근 차단 (403)
-        if (member.getStatus() == MemberStatus.WITHDRAWN) {
-            throw new BusinessException(
-                    MemberErrorCode.MEMBER_WITHDRAWN
-            );
-        }
-
-        // 5. 정상 회원 반환
+        // 3. 정상 회원 반환
         return member;
     }
 
 
+    // 만료된 정지 해제를 저장해야 하므로 쓰기 트랜잭션 (클래스 기본값 readOnly에서는 변경이 flush되지 않는다)
+    @Transactional
     public MemberResponse getMyInfo(Long memberId) {
         Member member = getActiveMember(memberId);
         return MemberResponse.from(member);
@@ -72,9 +60,12 @@ public class MemberService {
     ) {
         Member member = getActiveMember(memberId);
 
+        // 가입과 같이 앞뒤 공백을 제거한 값으로 확인·저장한다
+        String nickname = request.nickname().trim();
+
         // 다른 회원이 쓰는 닉네임이면 409 (자기 닉네임은 허용)
         if (memberRepository.existsByNicknameAndIdNot(
-                request.nickname(),
+                nickname,
                 memberId
         )) {
             throw new BusinessException(
@@ -82,7 +73,7 @@ public class MemberService {
             );
         }
 
-        member.updateNickname(request.nickname());
+        member.updateNickname(nickname);
 
         try {
             // 커밋 때가 아니라 지금 UPDATE를 실행해 동시 수정의 닉네임 UNIQUE 충돌을 여기서 확인

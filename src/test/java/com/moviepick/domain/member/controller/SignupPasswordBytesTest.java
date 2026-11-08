@@ -1,5 +1,6 @@
 package com.moviepick.domain.member.controller;
 
+import com.moviepick.global.security.RefreshTokenCookieFactory;
 import com.moviepick.domain.member.service.MemberStatusChecker;
 import com.moviepick.domain.member.service.MemberService;
 import com.moviepick.global.security.SecurityConfig;
@@ -39,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         }
 )
 @Import({
+        RefreshTokenCookieFactory.class,
         SecurityConfig.class,
         CustomAuthenticationEntryPoint.class,
         CustomAccessDeniedHandler.class,

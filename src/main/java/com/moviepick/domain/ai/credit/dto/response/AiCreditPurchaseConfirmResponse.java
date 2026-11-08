@@ -1,7 +1,7 @@
 package com.moviepick.domain.ai.credit.dto.response;
 
-import com.moviepick.domain.support.dto.response.ConfirmResult;
-import com.moviepick.domain.support.entity.PaymentStatus;
+import com.moviepick.domain.payment.dto.response.ConfirmResult;
+import com.moviepick.domain.payment.entity.PaymentStatus;
 
 /**
  * 구매 확정 응답. 앞 네 필드는 후원 확인 응답(SupportConfirmResponse)과 같고, 확정 후 크레딧 잔액을 붙인다.

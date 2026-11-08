@@ -107,7 +107,7 @@ public class AiMovieRankingService {
         );
     }
 
-    // [추가] 요청 관련성과 회원 개인화 점수를 합산
+    // 요청 관련성과 회원 개인화 점수를 합산
     public List<AiMovieCandidate> rank(
             String userRequest,
             List<AiMovieCandidate> candidates,
@@ -142,7 +142,7 @@ public class AiMovieRankingService {
             unique.putIfAbsent(movie.movieId(), movie);
         }
 
-        // [추가] 영화마다 최종 점수를 한 번씩 계산
+        // 영화마다 최종 점수를 한 번씩 계산
         List<ScoredMovie> scoredMovies = new ArrayList<>();
 
         for (AiMovieCandidate movie : unique.values()) {

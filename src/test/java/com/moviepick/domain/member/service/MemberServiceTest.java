@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.member.service;
 
 import com.moviepick.domain.member.entity.Member;

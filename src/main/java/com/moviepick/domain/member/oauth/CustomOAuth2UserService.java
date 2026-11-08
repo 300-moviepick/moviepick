@@ -27,7 +27,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     public OAuth2User loadUser(OAuth2UserRequest userRequest)
             throws OAuth2AuthenticationException {
 
-
         OAuth2User oauth2User = super.loadUser(userRequest);
 
         String registrationId = userRequest
@@ -81,17 +80,16 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                         "카카오 회원을 찾을 수 없습니다."
                 ));
 
-            // 정지 기간이 만료되었다면 자동 해제
+        // 정지 기간이 만료되었다면 자동 해제
         member.releaseSuspensionIfExpired();
 
-            // 아직 정지 상태이거나 탈퇴한 회원은 로그인 차단
+        // 아직 정지 상태이거나 탈퇴한 회원은 로그인 차단
         // 실패 처리기가 정지·탈퇴를 구분할 수 있도록 오류 코드를 붙인다
         if (member.getStatus() != MemberStatus.ACTIVE) {
             throw OAuth2LoginFailureHandler.inactiveMemberException(
                     member.getStatus()
             );
         }
-
 
         return oauth2User;
     }

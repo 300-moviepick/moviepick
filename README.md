@@ -3,7 +3,7 @@
 영화 탐색 · 리뷰 커뮤니티 플랫폼
 
 ## 기술 스택
-Java 17 · Spring Boot 4.1.1 · Spring Data JPA · Spring Batch · MySQL 8.0 · Redis 7.2 · Docker · Gradle
+Java 17 · Spring Boot 4.1.1 · Spring Security(JWT, OAuth2) · Spring Data JPA · QueryDSL · Spring Batch · Spring AI(OpenAI) · MySQL 8.0 · Redis 7.2 · PortOne · Docker · Gradle
 
 ## 처음 실행하기 (팀원용)
 팀 전원이 같은 Docker MySQL·Redis를 쓴다. PC에 설치된 MySQL(3306)·Redis(6379)와 겹치지 않도록 MySQL은 3307, Redis는 6380 포트를 쓴다.
@@ -41,14 +41,32 @@ MySQL 데이터 볼륨이 비어 있을 때(처음 만들 때) `db/init/00-init.
 | 순서 | 파일 | 내용 |
 |---|---|---|
 | 1 | `db/schema.sql` | 기본 테이블 |
-| 2 | `db/ai-credit-wallet-schema.sql` | AI 크레딧 지갑 |
-| 3 | `db/ai-credit-transactions-schema.sql` | AI 크레딧 거래 원장 |
-| 4 | `db/batch-schema.sql` | Spring Batch 실행 이력 테이블 |
-| 5 | `db/data.sql` | 관리자 계정 |
-| 6 | `db/seed/*.sql` | 영화 덤프. 폴더 안의 `.sql`을 이름순으로 모두 실행하고, 없으면 영화 없이 시작한다 |
+| 2 | `db/movie-embeddings-schema.sql` | 영화 임베딩(AI 의미 검색) |
+| 3 | `db/ai-credit-wallet-schema.sql` | AI 크레딧 지갑 |
+| 4 | `db/ai-credit-transactions-schema.sql` | AI 크레딧 거래 원장 |
+| 5 | `db/ai-recommendation-feedback-schema.sql` | AI 추천 피드백 |
+| 6 | `db/batch-schema.sql` | Spring Batch 실행 이력 테이블 |
+| 7 | `db/data.sql` | 관리자 계정 |
+| 8 | `db/seed/*.sql` | 영화 덤프. 폴더 안의 `.sql`을 이름순으로 모두 실행하고, 없으면 영화 없이 시작한다 |
 
 - SQL 하나가 실패하면 초기화가 그 자리에서 멈춘다.
 - 진행 상황은 `docker compose logs mysql`의 `[moviepick-init] 실행: ...` 줄로 확인한다.
+
+### 환경변수
+`.env.example`에 모든 변수와 설명이 있다. 값을 채워야 하는 것과 기본값으로 동작하는 것은 아래와 같다.
+
+| 구분 | 변수 | 기본값 | 설명 |
+|---|---|---|---|
+| 필수 | `JWT_SECRET`, `TMDB_ACCESS_TOKEN` | 없음 | 비어 있으면 앱이 시작되지 않는다 |
+| DB·Redis | `MYSQL_*`, `REDIS_PORT` | 3307 / 6380 등 | Docker와 앱이 같이 읽는다 |
+| 결제 | `PORTONE_API_SECRET`, `PORTONE_STORE_ID`, `PORTONE_CHANNEL_KEY`, `PORTONE_WEBHOOK_SECRET` | 빈 값 | 비어 있어도 시작되지만 결제 확인·웹훅이 실패한다. PortOne 콘솔의 웹훅 주소는 `{서버 주소}/api/webhooks/portone`(후원·AI 크레딧 공통) |
+| 소셜 로그인 | `KAKAO_*`, `GOOGLE_*` | 더미 값 | 카카오·구글 로그인을 쓸 때 채운다 |
+| AI 스위치 | `AI_CHAT_PROVIDER`, `AI_EMBEDDING_PROVIDER` | `none` | `openai`일 때만 AI 추천·크레딧 구매 시작(chat), 의미 검색(embedding)이 켜진다 |
+| AI | `OPENAI_API_KEY` | 빈 값 | AI를 켤 때 필요 |
+| AI 상한 | `OPENAI_CHAT_*`, `OPENAI_EMBEDDING_*` | 모델 `gpt-4o-mini`·`text-embedding-3-small`, 1000토큰, 15초, 재시도 0, 768차원 | 보통 바꾸지 않는다 |
+| 프론트 | `APP_FRONTEND_URL`, `APP_FRONTEND_ALLOWED_ORIGINS` | `http://localhost:5173` | 소셜 로그인 후 이동 주소, CORS 허용 주소 |
+| 쿠키 | `APP_COOKIE_SECURE` | `false` | HTTPS 운영에서는 `true` |
+| 배치 | `MOVIE_BATCH_*` | 아래 [정기 수집](#정기-수집) 참고 | |
 
 ## IntelliJ 실행 설정
 `Run/Debug Configurations` → `MoviePickApplication`

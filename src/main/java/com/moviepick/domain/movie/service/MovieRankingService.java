@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.movie.service;
 
 import com.moviepick.domain.movie.dto.response.MovieRankingResponse;

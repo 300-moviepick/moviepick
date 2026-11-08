@@ -1,5 +1,6 @@
 package com.moviepick.domain.ai.credit.service;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.entity.AiCreditEventType;
 import com.moviepick.domain.ai.credit.entity.AiCreditTransaction;
 import com.moviepick.domain.ai.credit.entity.AiCreditWallet;
@@ -9,7 +10,6 @@ import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.repository.MemberRepository;
 import com.moviepick.global.config.JpaAuditingConfig;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.PessimisticLockException;
 import org.junit.jupiter.api.AfterEach;
@@ -169,7 +169,7 @@ class AiCreditSpendConcurrencyTest {
             return Outcome.SUCCESS;
 
         } catch (BusinessException e) {
-            if (e.getErrorCode() == CommonErrorCode.AI_CREDIT_INSUFFICIENT) {
+            if (e.getErrorCode() == AiErrorCode.AI_CREDIT_INSUFFICIENT) {
                 return Outcome.INSUFFICIENT;
             }
             throw e;
