@@ -57,6 +57,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         }
 )
 @Import({
+        RefreshTokenCookieFactory.class,
         SecurityConfig.class,
         CustomAuthenticationEntryPoint.class,
         CustomAccessDeniedHandler.class,

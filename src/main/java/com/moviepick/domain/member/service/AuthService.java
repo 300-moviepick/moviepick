@@ -1,6 +1,5 @@
 package com.moviepick.domain.member.service;
 
-import com.moviepick.domain.ai.credit.service.AiSignupCreditService;
 import com.moviepick.domain.member.dto.request.LoginRequest;
 import com.moviepick.domain.member.dto.request.SignupRequest;
 import com.moviepick.domain.member.dto.response.LoginResponse;
@@ -8,7 +7,6 @@ import com.moviepick.domain.member.dto.response.MemberResponse;
 import com.moviepick.domain.member.dto.response.TokenPair;
 import com.moviepick.domain.member.entity.AuthProvider;
 import com.moviepick.domain.member.entity.Member;
-import com.moviepick.domain.member.entity.MemberStatus;
 import com.moviepick.domain.member.exception.MemberErrorCode;
 import com.moviepick.domain.member.repository.MemberConstraints;
 import com.moviepick.domain.member.repository.MemberRepository;
@@ -74,7 +72,7 @@ public class AuthService {
             // 즉시 INSERT를 실행해 DB UNIQUE 충돌 확인
             Member savedMember = memberRepository.saveAndFlush(member);
 
-            // [변경 ③] Port를 통한 회원가입 혜택 지급
+            // Port를 통해 회원가입 혜택 지급
             signupBenefitPort.grantTo(savedMember);
 
             return MemberResponse.from(savedMember);
@@ -147,49 +145,36 @@ public class AuthService {
             );
         }
 
-        // 3. 정지 기간이 만료되었다면 자동 해제
-        member.releaseSuspensionIfExpired();
+        // 3. 만료된 정지는 해제하고, 정지·탈퇴 회원은 로그인 차단
+        member.releaseExpiredSuspensionAndRequireActive();
 
-        // 4. 아직 정지 상태라면 로그인 차단
-        if (member.getStatus() == MemberStatus.SUSPENDED) {
-            throw new BusinessException(
-                    MemberErrorCode.MEMBER_SUSPENDED
-            );
-        }
-
-        if (member.getStatus() == MemberStatus.WITHDRAWN) {
-            throw new BusinessException(
-                    MemberErrorCode.MEMBER_WITHDRAWN
-            );
-        }
-
-        // 5. Access Token 생성
+        // 4. Access Token 생성
         String accessToken = jwtProvider.createAccessToken(
                 member.getId(),
                 member.getRole().name()
         );
 
-        // 6. 회원의 현재 인증 버전 조회
+        // 5. 회원의 현재 인증 버전 조회
         long authVersion =
                 refreshTokenService.getAuthVersion(member.getId());
 
-        // 7. 인증 버전이 포함된 Refresh Token 생성
+        // 6. 인증 버전이 포함된 Refresh Token 생성
         String refreshToken = jwtProvider.createRefreshToken(
                 member.getId(),
                 authVersion
         );
 
-        // 8. Redis에 Refresh Token 저장
+        // 7. Redis에 Refresh Token 저장
         refreshTokenService.save(
                 member.getId(),
                 refreshToken
         );
 
-        // 9. 로그인 응답 생성
+        // 8. 로그인 응답 생성
         LoginResponse loginResponse =
                 LoginResponse.of(member, accessToken);
 
-        // 10. Access Token 응답과 Refresh Token 함께 반환
+        // 9. Access Token 응답과 Refresh Token 함께 반환
         return new LoginResult(loginResponse, refreshToken);
     }
 
@@ -259,20 +244,8 @@ public class AuthService {
                         CommonErrorCode.UNAUTHORIZED
                 ));
 
-        // 정지 기간이 만료되었다면 자동 해제
-        member.releaseSuspensionIfExpired();
-
-        if (member.getStatus() == MemberStatus.SUSPENDED) {
-            throw new BusinessException(
-                    MemberErrorCode.MEMBER_SUSPENDED
-            );
-        }
-
-        if (member.getStatus() == MemberStatus.WITHDRAWN) {
-            throw new BusinessException(
-                    MemberErrorCode.MEMBER_WITHDRAWN
-            );
-        }
+        // 만료된 정지는 해제하고, 정지·탈퇴 회원은 재발급 차단
+        member.releaseExpiredSuspensionAndRequireActive();
 
         // 새 Refresh Token 발급 후 저장 (이전 토큰은 consume에서 이미 삭제됨)
         String newRefreshToken = jwtProvider.createRefreshToken(member.getId(), currentVersion);

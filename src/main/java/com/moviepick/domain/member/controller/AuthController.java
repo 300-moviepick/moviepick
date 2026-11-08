@@ -9,17 +9,15 @@ import com.moviepick.domain.member.dto.response.LoginResult;
 import com.moviepick.domain.member.dto.response.TokenRefreshResponse;
 import com.moviepick.domain.member.dto.response.TokenPair;
 import com.moviepick.domain.member.service.AuthService;
+import com.moviepick.global.security.RefreshTokenCookieFactory;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Duration;
 
 @RestController
 @RequiredArgsConstructor
@@ -27,10 +25,7 @@ import java.time.Duration;
 public class AuthController {
 
     private final AuthService authService;
-
-    // refreshToken 쿠키 Secure 속성 (app.cookie.secure, 로컬 기본 false)
-    @Value("${app.cookie.secure:false}")
-    private boolean secureCookie;
+    private final RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     // 회원가입 API
     @PostMapping("/members")
@@ -54,7 +49,7 @@ public class AuthController {
         LoginResult result = authService.login(request);
 
         // 2. Refresh Token 쿠키 생성
-        ResponseCookie refreshTokenCookie = refreshTokenCookie(result.refreshToken());
+        ResponseCookie refreshTokenCookie = refreshTokenCookieFactory.create(result.refreshToken());
 
         // 3. Access Token은 JSON 응답으로 전달
         // Refresh Token은 HttpOnly 쿠키로 전달
@@ -82,14 +77,7 @@ public class AuthController {
         authService.logout(refreshToken);
 
         // 2. 브라우저의 Refresh Token 쿠키 만료
-        ResponseCookie deleteCookie = ResponseCookie
-                .from("refreshToken", "")
-                .httpOnly(true)
-                .secure(secureCookie)
-                .sameSite("Strict")
-                .path("/api/auth")
-                .maxAge(0)
-                .build();
+        ResponseCookie deleteCookie = refreshTokenCookieFactory.expire();
 
         // 3. 쿠키 삭제 응답 반환
         return ResponseEntity
@@ -118,22 +106,10 @@ public class AuthController {
                 .ok()
                 .header(
                         HttpHeaders.SET_COOKIE,
-                        refreshTokenCookie(tokens.refreshToken()).toString()
+                        refreshTokenCookieFactory.create(tokens.refreshToken()).toString()
                 )
                 .body(
                         ApiResponse.ok(new TokenRefreshResponse(tokens.accessToken()))
                 );
-    }
-
-    // Refresh Token 쿠키 (로그인·재발급 공통)
-    private ResponseCookie refreshTokenCookie(String refreshToken) {
-        return ResponseCookie
-                .from("refreshToken", refreshToken)
-                .httpOnly(true)
-                .secure(secureCookie)
-                .sameSite("Strict")
-                .path("/api/auth")
-                .maxAge(Duration.ofDays(14))
-                .build();
     }
 }

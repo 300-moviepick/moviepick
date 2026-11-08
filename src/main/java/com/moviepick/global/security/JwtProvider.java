@@ -1,4 +1,3 @@
-
 package com.moviepick.global.security;
 
 import io.jsonwebtoken.Claims;
@@ -11,22 +10,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.time.Duration;
 import java.util.Date;
 import java.util.UUID;
 
 @Component
 public class JwtProvider {
 
+    // Access Token 유효시간: 30분 (로그인 응답의 expiresIn도 이 값을 쓴다)
+    public static final Duration ACCESS_TOKEN_TTL = Duration.ofMinutes(30);
+
+    // Refresh Token 유효시간: 14일 (Redis 저장 기간, 쿠키 Max-Age도 이 값을 쓴다)
+    public static final Duration REFRESH_TOKEN_TTL = Duration.ofDays(14);
+
     private final SecretKey secretKey;
-
-    // Access Token 유효시간: 30분
-    private static final long ACCESS_TOKEN_EXPIRATION =
-            30 * 60 * 1000L;
-
-    // Refresh Token 유효시간: 14일
-    private static final long REFRESH_TOKEN_EXPIRATION =
-            14 * 24 * 60 * 60 * 1000L;
-
 
     public JwtProvider(@Value("${jwt.secret}") String secret) {
         String errorMessage =
@@ -66,7 +63,7 @@ public class JwtProvider {
                 .claim("type", "access")
                 .issuedAt(now)
                 .expiration(new Date(
-                        now.getTime() + ACCESS_TOKEN_EXPIRATION
+                        now.getTime() + ACCESS_TOKEN_TTL.toMillis()
                 ))
                 .signWith(secretKey)
                 .compact();
@@ -84,7 +81,7 @@ public class JwtProvider {
                 .claim("authVersion", authVersion)
                 .issuedAt(now)
                 .expiration(new Date(
-                        now.getTime() + REFRESH_TOKEN_EXPIRATION
+                        now.getTime() + REFRESH_TOKEN_TTL.toMillis()
                 ))
                 .signWith(secretKey)
                 .compact();

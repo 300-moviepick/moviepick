@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.util.HexFormat;
 
 @Service
@@ -15,10 +14,6 @@ import java.util.HexFormat;
 public class RefreshTokenService {
 
     private final StringRedisTemplate redisTemplate;
-
-    // Refresh Token 유효기간: 14일
-    private static final Duration REFRESH_TOKEN_TTL =
-            Duration.ofDays(14);
 
     // Redis에 Refresh Token 저장
     public void save(Long memberId, String refreshToken) {
@@ -28,7 +23,7 @@ public class RefreshTokenService {
         redisTemplate.opsForValue().set(
                 key,
                 memberId.toString(),
-                REFRESH_TOKEN_TTL
+                JwtProvider.REFRESH_TOKEN_TTL
         );
     }
 
