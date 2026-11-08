@@ -173,3 +173,153 @@ TMDB 인기 영화를 수집해 `movies`, `movie_genres`에 저장한다. 팀원
   - dev를 받은 뒤 스키마 검증 오류가 나면 위 [문제 해결](#문제-해결)처럼 DB를 새로 만든다.
 - 응답은 `ApiResponse`를, 예외는 `BusinessException`과 도메인별 `ErrorCode`를 사용한다.
 - 테스트는 H2로 실행된다(`src/test/resources/config/application.yml`).
+
+## 배포 (운영, 초안)
+> ⑤-2에서 실제 진행 순서에 맞춰 다시 고친다. 명령은 EC2(Ubuntu)의 터미널에서 실행한다(PC에서 실행하는 명령은 따로 표시).
+
+### 구성
+| 항목 | 내용 |
+|---|---|
+| 주소 | 프론트 `https://www.moviepick.kr`(Vercel, 루트 `moviepick.kr`은 www로 이동), 백엔드 `https://api.moviepick.kr` |
+| 서버 | AWS EC2 1대(서울, Ubuntu, 메모리 4GB). Docker로 앱·MySQL·Redis·Caddy를 함께 실행 |
+| 파일 | `docker-compose.prod.yml`(운영 compose), `Dockerfile`(앱 이미지), `Caddyfile`(HTTPS·리버스 프록시), `.env.prod.example`(운영 `.env` 예시), `src/main/resources/application-prod.yml`(prod 프로필) |
+| 요청 경로 | 브라우저 → Vercel(`/api`, `/oauth2/authorization`, `/login/oauth2` 중계) → Caddy(443) → 앱(8080). PortOne 웹훅은 Caddy로 바로 들어온다 |
+| 브랜치 | EC2는 `main`을 받는다. 배포 전에 `dev` → `main` 머지 |
+
+### 1. EC2 준비
+1. EC2 인스턴스를 만든다(서울 리전, Ubuntu, 메모리 4GB). 키 페어 `.pem`은 공유하거나 커밋하지 않는다.
+2. 고정 IP(탄력적 IP)를 연결한다.
+3. 보안 그룹 인바운드 규칙
+   - TCP 80·443: 전체(0.0.0.0/0) — 인증서 발급과 HTTPS
+   - TCP 22: **내 IP만**
+   - UDP 443: 선택(HTTP/3). 열지 않아도 정상 동작한다
+   - **3306(MySQL)·6379(Redis)·8080(앱)은 열지 않는다**
+4. DNS에 `api` A 레코드 → 고정 IP. **Caddy를 띄우기 전에** 연결되어 있어야 인증서가 발급된다(`nslookup api.moviepick.kr`로 확인).
+5. 스왑 2GB를 만든다(서버에서 이미지를 빌드할 때 메모리 여유).
+   ```bash
+   sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+   ```
+   ```bash
+   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+   ```
+
+### 2. Docker 엔진·compose 설치
+PC의 Docker Desktop과 별개로 EC2에 설치한다([공식 안내](https://docs.docker.com/engine/install/ubuntu/)).
+```bash
+sudo apt-get update && sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker $USER
+```
+- 마지막 명령 후 접속을 끊었다가 다시 접속한다. `docker compose version`으로 확인한다.
+
+### 3. 저장소 받기
+```bash
+git clone -b main https://github.com/spa-300/moviepick.git ~/moviepick
+```
+
+### 4. 영화 덤프 옮기기
+`db/seed/`의 덤프는 Git에 없으므로 PC에서 직접 보낸다. **처음 compose를 실행하기 전에** 넣어야 적재된다.
+```bash
+# PC의 Git Bash, 백엔드 폴더에서 실행
+scp -i <키 파일 경로>.pem db/seed/movies_batch_20261106.sql ubuntu@<고정 IP>:~/moviepick/db/seed/
+```
+- `db/seed/`에는 덤프 하나만 둔다. 처음 실행 때 `db/init/00-init.sh`가 스키마(`movie_embeddings`, `AI_CREDIT`이 포함된 `payments.product_type` 포함) → 관리자 계정 → 덤프 순서로 적재한다.
+
+### 5. 운영 `.env` 작성
+```bash
+cd ~/moviepick && cp .env.prod.example .env && nano .env
+```
+- 파일 안 안내대로 채운다. **빈 값으로 두지 않는다**(기본값이 있는 변수를 빈 값으로 두면 기동에 실패할 수 있다. 안 쓰는 줄은 지운다).
+- 아래 [운영 .env 체크리스트](#운영-env-체크리스트)로 확인한다.
+
+### 6. 실행
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+```bash
+docker compose -f docker-compose.prod.yml logs -f mysql
+```
+- 마지막 `ready for connections ... port: 3306`을 확인한다(덤프 적재로 몇 분 걸릴 수 있다). 그동안 앱이 DB 연결에 실패하면 자동으로 다시 시작된다.
+- `docker compose -f docker-compose.prod.yml logs -f app`에서 `Started MoviePickApplication`을 확인한다.
+
+### 7. 인증서 확인
+```bash
+docker compose -f docker-compose.prod.yml logs caddy | grep -i "certificate obtained"
+```
+```bash
+curl -s "https://api.moviepick.kr/api/movies?page=0&size=1" | head -c 200
+```
+- `"success":true`로 시작하는 응답이 오면 HTTPS·앱·DB가 모두 정상이다.
+
+### 8. 관리자 비밀번호 변경
+시드 관리자 계정(`db/data.sql`)은 공개된 비밀번호를 쓰므로 운영에서는 바로 바꾼다. 비밀번호 변경 API가 없어 DB에서 직접 바꾼다. **비밀번호와 해시는 어디에도 적지 않는다.**
+1. bcrypt 해시를 만든다(비밀번호는 입력 프롬프트에 친다. 명령에 쓰면 기록에 남는다).
+   ```bash
+   sudo apt-get install -y apache2-utils && htpasswd -nBC 10 ""
+   ```
+   - 출력의 맨 앞 `:`를 뺀 `$2y$10$...` 전체가 해시다.
+2. DB에 접속해 관리자 계정의 `password_hash`를 바꾼다.
+   ```bash
+   docker compose -f docker-compose.prod.yml exec mysql sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'
+   ```
+   - `UPDATE members SET password_hash = '<만든 해시>' WHERE email = 'admin@admin.com';` 실행 후 `exit`
+3. 새 비밀번호로 관리자 로그인을 확인한다.
+
+### 9. 운영 임베딩 일괄 생성 (1회)
+AI 추천은 영화 임베딩이 있어야 동작한다. 영화 2,000편 기준 비용 약 0.02달러.
+1. `.env`에 `MOVIE_EMBEDDING_BULKSYNC_ENABLED=true` 줄을 추가하고 앱만 다시 띄운다.
+   - 설정 이름 `movie.embedding.bulk-sync.enabled`를 환경변수로 쓴 것이다(점은 `_`, `-`는 뺀다).
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d app
+   ```
+2. `docker compose -f docker-compose.prod.yml logs -f app`에서 `전체 영화 임베딩 수집 완료 ... failed=0`을 확인한다.
+3. **바로 그 줄을 지우고** 앱을 다시 띄운다(`up -d app`). 실패가 있으면 앱이 시작 실패 → 자동 재시작을 반복하며 다시 수집하므로, 실패해도 줄을 먼저 지우고 원인을 확인한다.
+
+### 10. 배포 후 수정
+- 백엔드: `dev` → `main` 머지 후 EC2에서
+  ```bash
+  cd ~/moviepick && git pull && docker compose -f docker-compose.prod.yml up -d --build app
+  ```
+  - 앱 컨테이너만 다시 빌드한다. MySQL·Redis·Caddy는 그대로 둔다.
+- **운영에서 `docker compose ... down -v`는 절대 쓰지 않는다.** DB 데이터와 인증서가 모두 지워진다. 멈출 때는 `down`(`-v` 없이)만 쓴다.
+- DB 구조가 바뀌면 init 스크립트는 다시 실행되지 않으므로, 바뀐 SQL을 운영 DB에 직접 적용한다(위 8-2의 접속 명령).
+- `.env`를 고쳤으면 `docker compose -f docker-compose.prod.yml up -d app`으로 앱을 다시 만든다(AI 스위치도 재시작해야 반영).
+
+### 운영 .env 체크리스트
+| 변수 | 운영 값 | 확인 |
+|---|---|---|
+| `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` | 로컬과 다른 새 값(처음 실행 후 바꾸지 않음) | [ ] |
+| `MYSQL_DATABASE`, `MYSQL_USER` | `moviepick` | [ ] |
+| `API_DOMAIN` | `api.moviepick.kr` | [ ] |
+| `JWT_SECRET` | 로컬과 다른 새 값(Base64, 디코딩 후 32바이트 이상) | [ ] |
+| `TMDB_ACCESS_TOKEN` | 채움 | [ ] |
+| `PORTONE_API_SECRET`, `PORTONE_STORE_ID`, `PORTONE_CHANNEL_KEY` | 테스트 채널 값(테스트 모드 유지) | [ ] |
+| `PORTONE_WEBHOOK_SECRET` | 웹훅 등록 시 발급한 시크릿. 등록 전에는 줄 삭제 | [ ] |
+| `KAKAO_*`, `GOOGLE_*` | 채움(빈 값이면 기동 실패) | [ ] |
+| `OPENAI_API_KEY` | 운영용 키(로컬과 분리, 선불·자동 충전 끔) | [ ] |
+| `AI_CHAT_PROVIDER`, `AI_EMBEDDING_PROVIDER` | `openai` | [ ] |
+| `APP_FRONTEND_URL`, `APP_FRONTEND_ALLOWED_ORIGINS` | `https://www.moviepick.kr` | [ ] |
+| `APP_COOKIE_SECURE` | `true` | [ ] |
+| `MOVIE_BATCH_SCHEDULER_ENABLED` | `true` | [ ] |
+| `MYSQL_PORT`, `REDIS_PORT`, `OPENAI_*` 상한 | 적지 않음(기본값) | [ ] |
+
+### 외부 콘솔 등록
+| 대상 | 주소 |
+|---|---|
+| 카카오 Redirect URI | `https://www.moviepick.kr/login/oauth2/code/kakao` (Web 사이트 도메인 `https://www.moviepick.kr`) |
+| 구글 승인된 리디렉션 URI | `https://www.moviepick.kr/login/oauth2/code/google` |
+| PortOne 웹훅 | `https://api.moviepick.kr/api/webhooks/portone` |
+- 로컬 개발용 주소(`http://localhost:8080/login/oauth2/code/...`)는 지우지 않는다. 운영에서는 prod 프로필이 콜백을 프론트 주소로 고정한다.
+
+### 배포 직후 확인
+- [ ] 가입·로그인·새로고침 후 로그인 유지·소셜 로그인(카카오·구글)
+- [ ] 영화 탐색·상세·랭킹·정렬 / 리뷰·커뮤니티·신고
+- [ ] AI 추천·크레딧 차감(응답이 Vercel 대기 한도 안에 오는지)
+- [ ] 크레딧 구매·후원 테스트 결제와 웹훅 수신 로그(`logs app | grep 웹훅`)
+- [ ] Vercel 중계: `/api/...`, `/oauth2/authorization/kakao`, `/login/oauth2/code/...`, `/movies/1`에서 새로고침
+- [ ] PortOne 모바일 결제 복귀 주소 `/ai/credits`, `/support`가 열리는지
+- [ ] 관리자 비밀번호 변경 완료, 운영 임베딩 생성 완료(`.env`에서 일괄 생성 줄 삭제)
