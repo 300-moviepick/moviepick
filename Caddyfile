@@ -1,0 +1,5 @@
+# 리버스 프록시 + HTTPS 인증서 자동 발급·갱신 (Let's Encrypt)
+# API_DOMAIN은 docker-compose.prod.yml에서 넘긴다 (기본 api.moviepick.kr)
+{$API_DOMAIN} {
+	reverse_proxy app:8080
+}
