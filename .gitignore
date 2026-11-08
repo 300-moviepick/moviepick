@@ -50,3 +50,5 @@ perf/results/*
 ### 로그 ###
 *.log
 logs/
+
+front/

@@ -72,6 +72,7 @@ services:
       - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./front:/srv/front:ro
       # 인증서·설정 저장소. 지우면 인증서를 다시 발급받는다
       - caddy-data:/data
       - caddy-config:/config
