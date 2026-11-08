@@ -1,4 +1,4 @@
-// 안우성: 리뷰 (perf-part1.md 4장)
+// 리뷰 (perf-part1.md 4장)
 //   allReviewsLikes [주력] GET /api/movies/reviews?sort=likes (page 0~2, 공개)
 //   movieReviews           GET /api/movies/{id}/reviews?sort=latest (인기 1위 / 일반 영화 번갈아, 공개)
 //   reviewWrite     [쓰기] 같은 영화(인기 1위)에 리뷰 작성 → 삭제 반복 (VU별 회원 perf{__VU})
@@ -9,7 +9,7 @@ import { buildOptions, dataOf, getCsrf, loginUsers, makeSummary, maxVus, measure
 
 const SCENARIO = __ENV.SCENARIO || 'allReviewsLikes';
 export const options = buildOptions(SCENARIO);
-export const handleSummary = makeSummary('woosung');
+export const handleSummary = makeSummary('review');
 
 export function setup() {
   const csrf = getCsrf();
