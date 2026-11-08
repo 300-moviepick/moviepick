@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.ai.credit.repository;
 
 import com.moviepick.domain.ai.credit.entity.AiCreditTransaction;
@@ -20,7 +19,7 @@ public interface AiCreditTransactionRepository
             String idempotencyKey
     );
 
-    // [추가] 특정 지갑의 거래 내역 페이징 조회
+    // 특정 지갑의 거래 내역 페이징 조회
     @EntityGraph(attributePaths = "payment")
     Page<AiCreditTransaction> findByWallet_Id(
             Long walletId,

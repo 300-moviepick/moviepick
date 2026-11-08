@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.movie.event;
 
 import com.moviepick.domain.movie.service.MovieRankingVersionService;

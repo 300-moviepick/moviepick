@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.community.entity;
 
 import com.moviepick.domain.member.entity.Member;

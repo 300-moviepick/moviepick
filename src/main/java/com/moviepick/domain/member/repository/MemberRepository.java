@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.member.repository;
 
 import com.moviepick.domain.member.entity.AuthProvider;

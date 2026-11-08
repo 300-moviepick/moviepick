@@ -1,4 +1,3 @@
-
 package com.moviepick.global.exception;
 
 import com.moviepick.global.response.ApiResponse;

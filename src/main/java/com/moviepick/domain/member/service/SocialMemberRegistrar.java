@@ -1,6 +1,5 @@
 package com.moviepick.domain.member.service;
 
-import com.moviepick.domain.ai.credit.service.AiSignupCreditService;
 import com.moviepick.domain.member.entity.AuthProvider;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.repository.MemberConstraints;
@@ -31,19 +30,16 @@ public class SocialMemberRegistrar {
 
     private final MemberRepository memberRepository;
     private final TransactionTemplate newTransaction;
-    // [변경 ②] Port 인터페이스에 의존
+    // 회원가입 혜택(AI 크레딧 지급)은 Port로 받아 ai 도메인에 직접 의존하지 않는다
     private final SignupBenefitPort signupBenefitPort;
 
 
     public SocialMemberRegistrar(
             MemberRepository memberRepository,
-            // [AI 추가 ③] 생성자 주입
-            // [변경 ③] 생성자 매개변수 변경
             SignupBenefitPort signupBenefitPort,
             PlatformTransactionManager transactionManager
     ) {
         this.memberRepository = memberRepository;
-        // [AI 추가 ④] 지급 서비스 연결
         this.signupBenefitPort = signupBenefitPort;
         this.newTransaction = new TransactionTemplate(transactionManager);
         this.newTransaction.setPropagationBehavior(
@@ -80,7 +76,7 @@ public class SocialMemberRegistrar {
                             )
                     );
 
-                    // [변경 ④] 같은 트랜잭션에서 Port 호출
+                    // 회원 저장과 같은 트랜잭션에서 회원가입 혜택 지급
                     signupBenefitPort.grantTo(saved);
 
                     return saved.getId();

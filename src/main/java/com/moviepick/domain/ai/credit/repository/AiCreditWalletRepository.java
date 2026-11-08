@@ -14,7 +14,7 @@ public interface AiCreditWalletRepository
 
     Optional<AiCreditWallet> findByMember_Id(Long memberId);
 
-    // [추가] 크레딧 사용 시 지갑에 쓰기 잠금을 건다.
+    // 크레딧 사용 시 지갑에 쓰기 잠금을 건다.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT w

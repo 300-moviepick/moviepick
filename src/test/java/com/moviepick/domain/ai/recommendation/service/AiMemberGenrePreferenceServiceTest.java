@@ -47,7 +47,7 @@ class AiMemberGenrePreferenceServiceTest {
                 review(101L, "5.0")
         );
 
-        // [변경 ①] Mock 데이터 먼저 생성
+        // Mock 데이터 먼저 생성
         MovieGenre sfGenre = genre(101L, "SF");
 
         given(movieGenreRepository.findAllByMovie_IdIn(List.of(101L)))
@@ -67,7 +67,7 @@ class AiMemberGenrePreferenceServiceTest {
                 review(101L, "1.0")
         );
 
-        // [변경 ②] Mock 데이터 먼저 생성
+        // Mock 데이터 먼저 생성
         MovieGenre romanceGenre = genre(101L, "로맨스");
 
         given(movieGenreRepository.findAllByMovie_IdIn(List.of(101L)))
@@ -88,7 +88,7 @@ class AiMemberGenrePreferenceServiceTest {
                 review(102L, "4.0")
         );
 
-        // [변경 ③] Mock 데이터 두 개를 미리 생성
+        // Mock 데이터 두 개를 미리 생성
         MovieGenre firstGenre = genre(101L, "SF");
         MovieGenre secondGenre = genre(102L, "SF");
 

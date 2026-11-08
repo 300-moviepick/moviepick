@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.community.service;
 
 import com.moviepick.domain.community.dto.response.CommentLikeResponse;

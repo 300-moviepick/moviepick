@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.ai.recommendation.service;
 
 import com.moviepick.domain.ai.recommendation.dto.AiMovieCandidate;
@@ -114,7 +113,7 @@ class SpringAiMovieReasonGeneratorTest {
     @Test
     void AI_호출_오류는_상위로_전달한다() {
 
-        // [변경 ①] JSON Schema 옵션을 받는 entity() Mock
+        // JSON Schema 옵션을 받는 entity() Mock
         when(chatClient.prompt()
                 .system(anyString())
                 .user(anyString())
@@ -129,7 +128,7 @@ class SpringAiMovieReasonGeneratorTest {
                 .hasMessageContaining("AI 호출 실패");
     }
 
-    // [변경 ②] 구조화 출력 옵션을 받는 Mock 응답
+    // 구조화 출력 옵션을 받는 Mock 응답
     private void mockAiResponse(AiMovieReasonBatch response) {
         when(chatClient.prompt()
                 .system(anyString())

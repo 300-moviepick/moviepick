@@ -38,7 +38,7 @@ public class AiCreditController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
-    // [추가] 로그인 회원의 거래 내역 조회
+    // 로그인 회원의 거래 내역 조회
     @GetMapping("/transactions")
     public ResponseEntity<ApiResponse<PageResponse<AiCreditTransactionResponse>>>
     getMyTransactions(

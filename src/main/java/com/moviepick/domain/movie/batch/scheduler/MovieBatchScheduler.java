@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.movie.batch.scheduler;
 
 import lombok.extern.slf4j.Slf4j;

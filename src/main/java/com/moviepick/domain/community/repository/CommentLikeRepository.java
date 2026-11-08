@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.community.repository;
 
 import com.moviepick.domain.community.entity.CommentLike;

@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.report.dto.request;
 
 import jakarta.validation.constraints.AssertTrue;

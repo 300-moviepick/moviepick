@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.movie.batch.scheduler;
 
 import org.junit.jupiter.api.Test;

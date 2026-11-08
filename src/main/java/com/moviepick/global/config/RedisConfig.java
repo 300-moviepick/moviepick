@@ -1,4 +1,3 @@
-
 package com.moviepick.global.config;
 
 import java.time.Duration;

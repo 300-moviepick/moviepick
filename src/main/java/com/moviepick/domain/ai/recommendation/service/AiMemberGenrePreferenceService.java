@@ -1,7 +1,6 @@
 package com.moviepick.domain.ai.recommendation.service;
 
 import com.moviepick.domain.ai.recommendation.dto.AiMovieCandidate;
-import com.moviepick.domain.movie.entity.MovieGenre;
 import com.moviepick.domain.movie.repository.MovieGenreRepository;
 import com.moviepick.domain.review.entity.Review;
 import com.moviepick.domain.review.entity.ReviewStatus;

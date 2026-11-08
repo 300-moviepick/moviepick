@@ -1,9 +1,8 @@
-
 package com.moviepick.domain.report.service;
 
 import com.moviepick.domain.report.dto.request.AdminReportProcessRequest;
 import com.moviepick.domain.report.repository.AdminSanctionRepository;
-import com.moviepick.domain.community.entity.*;
+import com.moviepick.domain.community.entity.Post;
 import com.moviepick.domain.report.entity.CommunityReport;
 import com.moviepick.domain.report.entity.ReportStatus;
 import com.moviepick.domain.report.entity.ReportTargetType;

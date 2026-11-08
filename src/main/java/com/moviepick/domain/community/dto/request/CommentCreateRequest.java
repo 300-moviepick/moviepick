@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.community.dto.request;
 
 import jakarta.validation.constraints.NotBlank;

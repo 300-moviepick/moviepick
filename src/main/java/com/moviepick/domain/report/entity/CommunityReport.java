@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.report.entity;
 
 import com.moviepick.domain.member.entity.Member;
@@ -22,7 +21,7 @@ import lombok.NoArgsConstructor;
                         name = "idx_report_target_status",
                         columnList = "target_type, target_id, status"
                 ),
-                // 관리자 신고 목록: 상태 필터 + 최신순 정렬 + 상태별 개수
+                // 관리자 신고 목록: 상태 필터 + 최신순 정렬 + 페이지 총건수(count)
                 @Index(
                         name = "idx_report_status_created_at",
                         columnList = "status, created_at, id"

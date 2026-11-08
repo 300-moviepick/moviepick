@@ -1,4 +1,3 @@
-
 package com.moviepick.domain.report.repository;
 
 import com.moviepick.domain.report.entity.AdminSanction;
