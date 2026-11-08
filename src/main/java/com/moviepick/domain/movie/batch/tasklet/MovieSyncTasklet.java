@@ -36,10 +36,7 @@ public class MovieSyncTasklet implements Tasklet {
         );
 
         // 3. 일부 실패 또는 중단이 발생하면 Batch 실패 처리
-        if (result.failedCount() > 0
-                || result.stoppedPage() != null
-                || result.stopReason() != null) {
-
+        if (result.hasFailure()) {
             throw new IllegalStateException(
                     "TMDB 영화 수집 실패: " + result
             );

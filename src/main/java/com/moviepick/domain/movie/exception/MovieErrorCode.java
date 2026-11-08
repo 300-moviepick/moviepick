@@ -36,6 +36,12 @@ public enum MovieErrorCode implements ErrorCode {
     TMDB_RESPONSE_FAILED(
             HttpStatus.BAD_GATEWAY,
             "TMDB 응답 오류"
+    ),
+
+    // 관리자 수동 실행한 영화 수집 배치가 COMPLETED로 끝나지 않은 경우
+    BATCH_EXECUTION_FAILED(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "영화 수집 배치가 정상 완료되지 않았습니다."
     );
 
     private final HttpStatus status;

@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
@@ -131,4 +133,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
               AND p.commentCount > 0
             """)
     int decreaseCommentCount(@Param("id") Long id);
+
+    // 관리자 신고 목록: 신고 대상 게시글과 작성자를 한 번에 조회 (행마다 조회하는 N+1 방지)
+    @Query("select p from Post p join fetch p.member where p.id in :ids")
+    List<Post> findWithMemberByIdIn(@Param("ids") Collection<Long> ids);
 }

@@ -225,6 +225,30 @@ class AdminReportServiceTest {
                 .isEqualTo(PostErrorCode.POST_NOT_FOUND);
     }
 
+    @Test
+    @DisplayName("게시글 신고 처리(승인·반려) 응답에도 대상 글 제목, 100자 미리보기, 작성자 닉네임이 담긴다 (R22)")
+    void processResponseHasPostTarget() {
+        Member writer = saveMember("writer");
+        String content = "가".repeat(150);
+        Post accepted = postRepository.save(Post.create(writer, "승인될 글", content));
+        Post rejected = postRepository.save(Post.create(writer, "반려될 글", content));
+        Long acceptId = saveReport(saveMember("reporter1"), accepted).getId();
+        Long rejectId = saveReport(saveMember("reporter2"), rejected).getId();
+
+        AdminReportResponse acceptResponse = adminReportService.processReport(acceptId, ACCEPT);
+        AdminReportResponse rejectResponse = adminReportService.processReport(
+                rejectId, new AdminReportProcessRequest(ReportStatus.REJECTED));
+
+        assertThat(acceptResponse.postTitle()).isEqualTo("승인될 글");
+        assertThat(acceptResponse.postContentPreview()).hasSize(100);
+        assertThat(acceptResponse.authorNickname()).isEqualTo("writer");
+        assertThat(acceptResponse.reviewContentPreview()).isNull();
+        assertThat(rejectResponse.status()).isEqualTo(ReportStatus.REJECTED);
+        assertThat(rejectResponse.postTitle()).isEqualTo("반려될 글");
+        assertThat(rejectResponse.postContentPreview()).hasSize(100);
+        assertThat(rejectResponse.authorNickname()).isEqualTo("writer");
+    }
+
     private Member saveMember(String nickname) {
         return memberRepository.save(
                 Member.createLocal(nickname + "@test.com", "encoded", nickname));

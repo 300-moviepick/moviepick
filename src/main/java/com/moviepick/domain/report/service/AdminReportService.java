@@ -1,11 +1,12 @@
-
 package com.moviepick.domain.report.service;
 
 import com.moviepick.domain.report.dto.request.AdminReportProcessRequest;
 import com.moviepick.domain.report.dto.response.AdminReportResponse;
 import com.moviepick.domain.report.entity.AdminSanction;
 import com.moviepick.domain.report.repository.AdminSanctionRepository;
-import com.moviepick.domain.community.entity.*;
+import com.moviepick.domain.community.entity.Comment;
+import com.moviepick.domain.community.entity.Post;
+import com.moviepick.domain.community.entity.PostStatus;
 import com.moviepick.domain.report.entity.CommunityReport;
 import com.moviepick.domain.report.entity.ReportStatus;
 import com.moviepick.domain.report.entity.ReportTargetType;
@@ -89,7 +90,7 @@ public class AdminReportService {
         if (postIds.isEmpty()) {
             return Map.of();
         }
-        return communityReportRepository.findPostsWithMemberByIdIn(postIds).stream()
+        return postRepository.findWithMemberByIdIn(postIds).stream()
                 .collect(Collectors.toMap(Post::getId, Function.identity()));
     }
 
@@ -98,7 +99,7 @@ public class AdminReportService {
         if (reviewIds.isEmpty()) {
             return Map.of();
         }
-        return communityReportRepository.findReviewsWithMemberByIdIn(reviewIds).stream()
+        return reviewRepository.findWithMemberByIdIn(reviewIds).stream()
                 .collect(Collectors.toMap(Review::getId, Function.identity()));
     }
 
@@ -316,65 +317,55 @@ public class AdminReportService {
         return content.substring(0, 100);
     }
 
-    // 신고 대상에 맞는 관리자 응답 생성
+    // 신고 처리 결과용 응답: 신고 대상을 하나 조회해 만든다 (대상이 없으면 대상 정보 없이 반환)
     private AdminReportResponse createReportResponse(CommunityReport report) {
-        if (report.getTargetType() == ReportTargetType.POST) {
-            return postRepository.findById(report.getTargetId())
-                    .map(post -> AdminReportResponse.from(
-                            report,
-                            post.getTitle(),
-                            createPreview(post.getContent()),
-                            post.getMember().getNickname()
-                    ))
-                    .orElseGet(() -> AdminReportResponse.from(report));
-        }
-
-        if (report.getTargetType() == ReportTargetType.REVIEW) {
-            return reviewRepository.findById(report.getTargetId())
-                    .map(review -> AdminReportResponse.forReview(
-                            report,
-                            createPreview(review.getContent()),
-                            review.getMember().getNickname(),
-                            review.getMovie().getId()
-                    ))
-                    .orElseGet(() -> AdminReportResponse.from(report));
-        }
-
-        return AdminReportResponse.from(report);
+        return switch (report.getTargetType()) {
+            case POST -> postReportResponse(
+                    report, postRepository.findById(report.getTargetId()).orElse(null));
+            case REVIEW -> reviewReportResponse(
+                    report, reviewRepository.findById(report.getTargetId()).orElse(null));
+            default -> AdminReportResponse.from(report);
+        };
     }
 
-    // 신고 목록용 응답 생성: 미리 조회한 대상으로 만든다 (대상이 없으면 대상 정보 없이 반환)
+    // 신고 목록용 응답: 미리 일괄 조회한 대상으로 만든다 (대상이 없으면 대상 정보 없이 반환)
     private AdminReportResponse createReportResponse(
             CommunityReport report,
             Map<Long, Post> postMap,
             Map<Long, Review> reviewMap
     ) {
-        if (report.getTargetType() == ReportTargetType.POST) {
-            Post post = postMap.get(report.getTargetId());
-            if (post == null) {
-                return AdminReportResponse.from(report);
-            }
-            return AdminReportResponse.from(
-                    report,
-                    post.getTitle(),
-                    createPreview(post.getContent()),
-                    post.getMember().getNickname()
-            );
+        return switch (report.getTargetType()) {
+            case POST -> postReportResponse(report, postMap.get(report.getTargetId()));
+            case REVIEW -> reviewReportResponse(report, reviewMap.get(report.getTargetId()));
+            default -> AdminReportResponse.from(report);
+        };
+    }
+
+    // 게시글 신고 응답: 글 제목, 본문 미리보기, 작성자 닉네임
+    private AdminReportResponse postReportResponse(CommunityReport report, Post post) {
+        if (post == null) {
+            return AdminReportResponse.from(report);
         }
 
-        if (report.getTargetType() == ReportTargetType.REVIEW) {
-            Review review = reviewMap.get(report.getTargetId());
-            if (review == null) {
-                return AdminReportResponse.from(report);
-            }
-            return AdminReportResponse.forReview(
-                    report,
-                    createPreview(review.getContent()),
-                    review.getMember().getNickname(),
-                    review.getMovie().getId()
-            );
+        return AdminReportResponse.from(
+                report,
+                post.getTitle(),
+                createPreview(post.getContent()),
+                post.getMember().getNickname()
+        );
+    }
+
+    // 리뷰 신고 응답: 리뷰 미리보기, 작성자 닉네임, 영화 번호
+    private AdminReportResponse reviewReportResponse(CommunityReport report, Review review) {
+        if (review == null) {
+            return AdminReportResponse.from(report);
         }
 
-        return AdminReportResponse.from(report);
+        return AdminReportResponse.forReview(
+                report,
+                createPreview(review.getContent()),
+                review.getMember().getNickname(),
+                review.getMovie().getId()
+        );
     }
 }
