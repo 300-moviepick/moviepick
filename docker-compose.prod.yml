@@ -1,0 +1,85 @@
+# moviepick 운영(EC2)용: 앱 + MySQL + Redis + Caddy(HTTPS)
+# 처음 한 번: .env.prod.example을 .env로 복사해 값을 채운다 → db/seed/에 영화 덤프를 넣는다 → 아래 실행
+#   docker compose -f docker-compose.prod.yml up -d --build
+# 앱만 다시 배포: docker compose -f docker-compose.prod.yml up -d --build app
+# 주의: 운영에서 down -v 는 절대 쓰지 않는다 (DB 데이터와 인증서가 모두 지워진다)
+# 외부에 공개하는 포트는 Caddy의 80·443뿐이다. MySQL·Redis·앱 포트는 열지 않는다
+name: moviepick-prod
+
+services:
+  mysql:
+    image: mysql:8.0.46
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env 파일에 MYSQL_ROOT_PASSWORD를 넣어 주세요}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-moviepick}
+      MYSQL_USER: ${MYSQL_USER:-moviepick}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?.env 파일에 MYSQL_PASSWORD를 넣어 주세요}
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+09:00
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 로컬과 같은 초기화 (데이터 볼륨이 비어 있을 때 한 번만). 영화 덤프는 db/seed/에 직접 옮긴다
+      - ./db:/db:ro
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  redis:
+    image: redis:7.2.17-alpine
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      TZ: Asia/Seoul
+      # 4GB 서버에서 MySQL·Redis와 함께 돌도록 힙 상한 1GB
+      JAVA_TOOL_OPTIONS: -Xms256m -Xmx1g -XX:+UseG1GC -Duser.timezone=Asia/Seoul
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    environment:
+      API_DOMAIN: ${API_DOMAIN:-api.moviepick.kr}
+    ports:
+      - "80:80"
+      - "443:443"
+      # HTTP/3 (선택). 보안 그룹에서 UDP 443을 열지 않아도 정상 동작한다
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 인증서·설정 저장소. 지우면 인증서를 다시 발급받는다
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+
+volumes:
+  mysql-data:
+  redis-data:
+  caddy-data:
+  caddy-config:

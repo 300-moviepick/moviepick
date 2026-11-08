@@ -1,4 +1,4 @@
-// 박지민: 회원·관리자·찜 (perf-part1.md 4장)
+// 회원·관리자·찜 (perf-part1.md 4장)
 //   adminReports   [주력] GET /api/admin/reports (전체 / status=PENDING 번갈아, page 0~4) — 관리자 토큰 1개 공유
 //   myWishlist            GET /api/members/me/wishlist — VU별 회원 perf{__VU} 토큰
 //   wishlistWrite  [쓰기] POST → DELETE /api/movies/{WISH_MOVIE_ID}/wishlist 반복
@@ -8,7 +8,7 @@ import { buildOptions, getCsrf, loginAdmin, loginUsers, makeSummary, maxVus, mea
 
 const SCENARIO = __ENV.SCENARIO || 'adminReports';
 export const options = buildOptions(SCENARIO);
-export const handleSummary = makeSummary('jimin');
+export const handleSummary = makeSummary('member');
 
 export function setup() {
   const csrf = getCsrf();

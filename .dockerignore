@@ -1,0 +1,15 @@
+# 이미지 빌드에 보내지 않을 파일 (비밀값·덤프·빌드 결과)
+.env
+.env.*
+!.env.example
+!.env.prod.example
+.git
+.github
+.gradle
+.idea
+.run
+build
+db
+perf
+*.log
+logs

@@ -46,3 +46,7 @@ db/seed/*
 !db/seed/.gitkeep
 perf/results/*
 !perf/results/_template.md
+
+### 로그 ###
+*.log
+logs/

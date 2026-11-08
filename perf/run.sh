@@ -5,7 +5,7 @@
 #       앱을 끈 상태에서 실행. DB를 새로 만들고(down -v → up -d) 더미 데이터를 적재한다.
 #       주의: 로컬 DB 데이터(회원·리뷰 등)가 모두 지워진다. --yes를 붙이면 확인 질문을 건너뛴다.
 #
-#   bash perf/run.sh measure <jimin|woosung|gunhee|rehearsal>
+#   bash perf/run.sh measure <member|review|community|rehearsal>
 #       앱을 측정용 설정(.run/MoviePick-perf.run.xml)으로 실행한 상태에서 실행.
 #       기준 측정 전부 → 주력 한계 측정 → EXPLAIN → (쓰기가 있으면) 정합성 확인 → perf/results/<이름>-<시각>/ 저장
 #
@@ -113,15 +113,15 @@ cmd_load() {
 # ---------------------------------------------------------------------
 scenarios_of() {
   case "$1" in
-    jimin)     echo "adminReports myWishlist wishlistWrite" ;;
-    woosung)   echo "allReviewsLikes movieReviews reviewWrite" ;;
-    gunhee)    echo "postsPopular postDetailHot postDetailSpread commentWrite" ;;
+    member)    echo "adminReports myWishlist wishlistWrite" ;;
+    review)    echo "allReviewsLikes movieReviews reviewWrite" ;;
+    community) echo "postsPopular postDetailHot postDetailSpread commentWrite" ;;
     rehearsal) echo "moviesRecent ranking" ;;
   esac
 }
 main_of() {
   case "$1" in
-    jimin) echo adminReports ;; woosung) echo allReviewsLikes ;; gunhee) echo postsPopular ;; rehearsal) echo moviesRecent ;;
+    member) echo adminReports ;; review) echo allReviewsLikes ;; community) echo postsPopular ;; rehearsal) echo moviesRecent ;;
   esac
 }
 has_write() { [ "$1" != "rehearsal" ]; }
@@ -155,7 +155,7 @@ run_k6() {  # $1 이름, $2 시나리오, $3 base|stress, $4 결과 폴더
 
 cmd_measure() {
   local name="${1:-}"
-  [ -n "$(scenarios_of "$name")" ] || die "측정 이름이 필요합니다: jimin | woosung | gunhee | rehearsal" "예: bash perf/run.sh measure rehearsal"
+  [ -n "$(scenarios_of "$name")" ] || die "측정 이름이 필요합니다: member | review | community | rehearsal" "예: bash perf/run.sh measure rehearsal"
   require_docker
 
   step "1/6 사전 확인"
@@ -237,7 +237,7 @@ case "${1:-}" in
   *)
     echo "사용법:"
     echo "  bash perf/run.sh load [--yes]                                  (앱 종료 상태) DB 재생성 + 더미 적재"
-    echo "  bash perf/run.sh measure <jimin|woosung|gunhee|rehearsal>      (앱 실행 상태) 측정 + EXPLAIN + 확인"
+    echo "  bash perf/run.sh measure <member|review|community|rehearsal>      (앱 실행 상태) 측정 + EXPLAIN + 확인"
     exit 1
     ;;
 esac

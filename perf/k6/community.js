@@ -1,4 +1,4 @@
-// 이건희: 커뮤니티 (perf-part1.md 4장)
+// 커뮤니티 (perf-part1.md 4장)
 //   postsPopular     [주력] GET /api/community/posts?sort=popular (page 0~2, 공개)
 //   postDetailHot           GET /api/community/posts/{HOT_POST_ID} — 같은 게시글 집중 (조회수 UPDATE 행 락 경합)
 //   postDetailSpread        GET /api/community/posts/{POST_MIN~POST_MAX 중 무작위} — 분산
@@ -9,7 +9,7 @@ import { buildOptions, getCsrf, loginUsers, makeSummary, maxVus, measureGet, mea
 
 const SCENARIO = __ENV.SCENARIO || 'postsPopular';
 export const options = buildOptions(SCENARIO);
-export const handleSummary = makeSummary('gunhee');
+export const handleSummary = makeSummary('community');
 
 export function setup() {
   const csrf = getCsrf();
