@@ -1,0 +1,37 @@
+# 운영(EC2) 전용 설정. docker-compose.prod.yml이 SPRING_PROFILES_ACTIVE=prod로 켠다
+# application.yml의 공통 설정 위에 덮어쓰며, 로컬 실행(local 프로필)에는 영향이 없다
+server:
+  # Caddy가 붙이는 X-Forwarded-Proto 등을 Tomcat이 읽어 https 요청으로 인식한다 (Secure 쿠키, 리다이렉트 주소)
+  forward-headers-strategy: native
+spring:
+  # 컨테이너 이름으로 접속한다. 포트는 컨테이너 내부 포트라 고정 (외부에 공개하지 않음)
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:mysql}:3306/${MYSQL_DATABASE:moviepick}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: 6379
+  batch:
+    jdbc:
+      # Spring Batch 테이블은 db/batch-schema.sql(init 스크립트)이 만든다
+      initialize-schema: never
+  security:
+    oauth2:
+      client:
+        registration:
+          # 소셜 로그인 콜백을 프론트 주소로 고정한다 (Vercel이 백엔드로 중계).
+          # 그래야 refresh 쿠키가 프론트 도메인에 저장된다. 카카오·구글 콘솔에도 같은 주소를 등록한다
+          kakao:
+            redirect-uri: "${app.frontend.url}/login/oauth2/code/{registrationId}"
+          google:
+            redirect-uri: "${app.frontend.url}/login/oauth2/code/{registrationId}"
+  jpa:
+    show-sql: false
+# 운영은 HTTPS라 refresh 토큰 쿠키에 Secure를 붙인다
+app:
+  cookie:
+    secure: ${APP_COOKIE_SECURE:true}
+# 실행 SQL 로그를 남기지 않는다
+logging:
+  level:
+    org.hibernate.SQL: warn
