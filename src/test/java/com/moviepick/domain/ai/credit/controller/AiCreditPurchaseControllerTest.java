@@ -1,5 +1,6 @@
 package com.moviepick.domain.ai.credit.controller;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.dto.request.AiCreditPurchaseRequest;
 import com.moviepick.domain.ai.credit.dto.response.AiCreditBalanceResponse;
 import com.moviepick.domain.ai.credit.dto.response.AiCreditProductResponse;
@@ -13,10 +14,9 @@ import com.moviepick.domain.member.oauth.OAuth2LoginFailureHandler;
 import com.moviepick.domain.member.oauth.OAuth2LoginSuccessHandler;
 import com.moviepick.domain.member.service.MemberService;
 import com.moviepick.domain.member.service.MemberStatusChecker;
-import com.moviepick.domain.support.dto.response.ConfirmResult;
-import com.moviepick.domain.support.entity.PaymentStatus;
+import com.moviepick.domain.payment.dto.response.ConfirmResult;
+import com.moviepick.domain.payment.entity.PaymentStatus;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import com.moviepick.global.security.CustomAccessDeniedHandler;
 import com.moviepick.global.security.CustomAuthenticationEntryPoint;
 import com.moviepick.global.security.JwtProvider;
@@ -144,7 +144,7 @@ class AiCreditPurchaseControllerTest {
         @Test
         void 알_수_없는_상품_코드는_400() throws Exception {
             given(purchaseService.createPurchase(eq(MEMBER_ID), any(AiCreditPurchaseRequest.class)))
-                    .willThrow(new BusinessException(CommonErrorCode.AI_CREDIT_PRODUCT_NOT_FOUND));
+                    .willThrow(new BusinessException(AiErrorCode.AI_CREDIT_PRODUCT_NOT_FOUND));
 
             mockMvc.perform(asMember(purchase("{\"productCode\":\"CREDIT_99\"}")))
                     .andExpect(status().isBadRequest())

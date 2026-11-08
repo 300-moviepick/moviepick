@@ -1,6 +1,6 @@
 package com.moviepick.domain.ai.credit.dto.response;
 
-import com.moviepick.domain.support.entity.Payment;
+import com.moviepick.domain.payment.entity.Payment;
 
 /**
  * 구매 생성 응답. 후원 생성 응답(SupportCreateResponse)과 같은 모양이다.

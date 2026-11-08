@@ -1,5 +1,6 @@
 package com.moviepick.domain.ai.credit.service;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.dto.request.AiCreditPurchaseRequest;
 import com.moviepick.domain.ai.credit.dto.response.AiCreditProductResponse;
 import com.moviepick.domain.ai.credit.dto.response.AiCreditPurchaseConfirmResponse;
@@ -7,17 +8,16 @@ import com.moviepick.domain.ai.credit.dto.response.AiCreditPurchaseCreateRespons
 import com.moviepick.domain.ai.credit.entity.AiCreditProduct;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.service.MemberService;
-import com.moviepick.domain.support.client.PortOneClient;
-import com.moviepick.domain.support.client.PortOnePayment;
-import com.moviepick.domain.support.client.PortOneProperties;
-import com.moviepick.domain.support.dto.response.ConfirmResult;
-import com.moviepick.domain.support.entity.Payment;
-import com.moviepick.domain.support.entity.PaymentStatus;
-import com.moviepick.domain.support.entity.ProductType;
-import com.moviepick.domain.support.repository.PaymentRepository;
-import com.moviepick.domain.support.service.port.PaidPaymentHandler;
+import com.moviepick.domain.payment.client.PortOneClient;
+import com.moviepick.domain.payment.client.PortOnePayment;
+import com.moviepick.domain.payment.client.PortOneProperties;
+import com.moviepick.domain.payment.dto.response.ConfirmResult;
+import com.moviepick.domain.payment.entity.Payment;
+import com.moviepick.domain.payment.entity.PaymentStatus;
+import com.moviepick.domain.payment.entity.ProductType;
+import com.moviepick.domain.payment.repository.PaymentRepository;
+import com.moviepick.domain.payment.service.port.PaidPaymentHandler;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,7 +40,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AiCreditPurchaseService implements PaidPaymentHandler {
 
-    private static final String CURRENCY_KRW = "KRW";
     private static final String PAYMENT_ID_PREFIX = "credit-";
 
     private final PaymentRepository paymentRepository;
@@ -68,7 +67,7 @@ public class AiCreditPurchaseService implements PaidPaymentHandler {
     ) {
         AiCreditProduct product = AiCreditProduct.fromCode(request.productCode())
                 .orElseThrow(() -> new BusinessException(
-                        CommonErrorCode.AI_CREDIT_PRODUCT_NOT_FOUND
+                        AiErrorCode.AI_CREDIT_PRODUCT_NOT_FOUND
                 ));
 
         Member member = memberService.getActiveMember(memberId);
@@ -93,11 +92,11 @@ public class AiCreditPurchaseService implements PaidPaymentHandler {
         Payment payment = paymentRepository.findByPaymentId(paymentId)
                 .filter(found -> found.getProductType() == ProductType.AI_CREDIT)
                 .orElseThrow(() -> new BusinessException(
-                        CommonErrorCode.AI_CREDIT_PURCHASE_NOT_FOUND
+                        AiErrorCode.AI_CREDIT_PURCHASE_NOT_FOUND
                 ));
 
         if (!payment.isOwnedBy(memberId)) {
-            throw new BusinessException(CommonErrorCode.NOT_AI_CREDIT_PURCHASE_OWNER);
+            throw new BusinessException(AiErrorCode.NOT_AI_CREDIT_PURCHASE_OWNER);
         }
 
         // 잔액 응답과 지급에 필요하다. 지급 트랜잭션보다 먼저 만든다
@@ -142,11 +141,13 @@ public class AiCreditPurchaseService implements PaidPaymentHandler {
 
         return switch (portOnePayment.status()) {
             case PAID -> {
-                if (isAmountMatched(payment, portOnePayment)) {
+                if (payment.matchesPaidAmount(portOnePayment.totalAmount(), portOnePayment.currency())) {
                     yield grant(payment);
                 }
-                log.warn("크레딧 결제 금액 불일치: paymentId={}, expectedAmount={}, actualAmount={}, currency={}",
-                        paymentId, payment.getAmount(), portOnePayment.totalAmount(), portOnePayment.currency());
+                log.warn("크레딧 결제 금액·통화 불일치: paymentId={}, expectedAmount={}, expectedCurrency={}, "
+                                + "actualAmount={}, actualCurrency={}",
+                        paymentId, payment.getAmount(), Payment.CURRENCY_KRW,
+                        portOnePayment.totalAmount(), portOnePayment.currency());
                 yield markFailed(paymentId);
             }
             // 같은 paymentId로 재시도할 수 있으므로 상태는 CREATED로 둔다.
@@ -170,7 +171,7 @@ public class AiCreditPurchaseService implements PaidPaymentHandler {
                 .orElseThrow(() -> {
                     log.error("결제 금액에 맞는 크레딧 상품 없음 — 수동 확인 필요: paymentId={}, amount={}",
                             payment.getPaymentId(), payment.getAmount());
-                    return new BusinessException(CommonErrorCode.AI_CREDIT_PRICE_UNMAPPED);
+                    return new BusinessException(AiErrorCode.AI_CREDIT_PRICE_UNMAPPED);
                 });
 
         boolean granted = grantService.markPaidAndGrant(
@@ -196,7 +197,7 @@ public class AiCreditPurchaseService implements PaidPaymentHandler {
     /** 조건부 UPDATE가 0행이면 다른 요청(웹훅 등)이 먼저 처리한 것이므로, 최신 상태를 다시 읽어 응답한다. */
     private Outcome byLatestStatus(String paymentId) {
         Payment latest = paymentRepository.findByPaymentId(paymentId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.AI_CREDIT_PURCHASE_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(AiErrorCode.AI_CREDIT_PURCHASE_NOT_FOUND));
         if (latest.getStatus() == PaymentStatus.CREATED) {
             return Outcome.pending(PaymentStatus.CREATED);
         }
@@ -208,12 +209,6 @@ public class AiCreditPurchaseService implements PaidPaymentHandler {
                 ? ConfirmResult.COMPLETED
                 : ConfirmResult.FAILED;   // FAILED, EXPIRED, CANCELLED
         return new Outcome(status, result);
-    }
-
-    private boolean isAmountMatched(Payment payment, PortOnePayment portOnePayment) {
-        return portOnePayment.totalAmount() != null
-                && portOnePayment.totalAmount() == payment.getAmount()
-                && CURRENCY_KRW.equals(portOnePayment.currency());
     }
 
     record Outcome(PaymentStatus status, ConfirmResult result) {

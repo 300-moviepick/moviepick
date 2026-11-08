@@ -2,19 +2,19 @@ package com.moviepick.domain.support.service;
 
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.service.MemberService;
-import com.moviepick.domain.support.client.PortOneClient;
-import com.moviepick.domain.support.client.PortOnePayment;
-import com.moviepick.domain.support.client.PortOneProperties;
+import com.moviepick.domain.payment.client.PortOneClient;
+import com.moviepick.domain.payment.client.PortOnePayment;
+import com.moviepick.domain.payment.client.PortOneProperties;
 import com.moviepick.domain.support.dto.request.SupportCreateRequest;
-import com.moviepick.domain.support.dto.response.ConfirmResult;
+import com.moviepick.domain.payment.dto.response.ConfirmResult;
 import com.moviepick.domain.support.dto.response.SupportConfirmResponse;
 import com.moviepick.domain.support.dto.response.SupportCreateResponse;
-import com.moviepick.domain.support.entity.Payment;
-import com.moviepick.domain.support.entity.PaymentStatus;
-import com.moviepick.domain.support.entity.ProductType;
+import com.moviepick.domain.payment.entity.Payment;
+import com.moviepick.domain.payment.entity.PaymentStatus;
+import com.moviepick.domain.payment.entity.ProductType;
 import com.moviepick.domain.support.exception.SupportErrorCode;
-import com.moviepick.domain.support.repository.PaymentRepository;
-import com.moviepick.domain.support.service.port.PaidPaymentHandler;
+import com.moviepick.domain.payment.repository.PaymentRepository;
+import com.moviepick.domain.payment.service.port.PaidPaymentHandler;
 import com.moviepick.global.exception.BusinessException;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -34,8 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class SupportService implements PaidPaymentHandler {
-
-    private static final String CURRENCY_KRW = "KRW";
 
     // 허용 금액과 주문명. 이 외의 금액은 거절한다.
     private static final Map<Long, String> ORDER_NAMES = Map.of(
@@ -106,11 +104,13 @@ public class SupportService implements PaidPaymentHandler {
 
         return switch (portOnePayment.status()) {
             case PAID -> {
-                if (isAmountMatched(payment, portOnePayment)) {
+                if (payment.matchesPaidAmount(portOnePayment.totalAmount(), portOnePayment.currency())) {
                     yield markPaid(paymentId);
                 }
-                log.warn("후원 결제 금액 불일치: paymentId={}, expectedAmount={}, actualAmount={}, currency={}",
-                        paymentId, payment.getAmount(), portOnePayment.totalAmount(), portOnePayment.currency());
+                log.warn("후원 결제 금액·통화 불일치: paymentId={}, expectedAmount={}, expectedCurrency={}, "
+                                + "actualAmount={}, actualCurrency={}",
+                        paymentId, payment.getAmount(), Payment.CURRENCY_KRW,
+                        portOnePayment.totalAmount(), portOnePayment.currency());
                 yield markFailed(paymentId);
             }
             // 같은 paymentId로 재시도할 수 있으므로 상태는 CREATED로 둔다.
@@ -126,12 +126,6 @@ public class SupportService implements PaidPaymentHandler {
                 yield pending(payment);
             }
         };
-    }
-
-    private boolean isAmountMatched(Payment payment, PortOnePayment portOnePayment) {
-        return portOnePayment.totalAmount() != null
-                && portOnePayment.totalAmount() == payment.getAmount()
-                && CURRENCY_KRW.equals(portOnePayment.currency());
     }
 
     private SupportConfirmResponse markPaid(String paymentId) {

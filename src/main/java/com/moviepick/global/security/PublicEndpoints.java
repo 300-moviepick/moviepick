@@ -27,7 +27,7 @@ public final class PublicEndpoints {
         // 로그아웃 및 토큰 재발급
         add(HttpMethod.POST, "/api/auth/logout", "/api/auth/refresh");
 
-        // 영화 목록 및 상세 조회
+        // 영화 목록, 상세, 랭킹(/api/movies/ranking은 /api/movies/*에 포함) 조회
         add(HttpMethod.GET, "/api/movies", "/api/movies/*");
 
         // 영화별 리뷰 목록 및 전체 리뷰 목록 조회
@@ -39,11 +39,11 @@ public final class PublicEndpoints {
                 "/api/community/posts/*",
                 "/api/community/posts/*/comments");
 
-        // 영화 목록, 상세, 랭킹, 확장 정보 조회
-        add(HttpMethod.GET, "/api/movies", "/api/movies/*", "/api/movies/*/extras");
+        // 영화 확장 정보(예고편·출연진·OTT) 조회
+        add(HttpMethod.GET, "/api/movies/*/extras");
 
-        // PortOne 후원 결제 웹훅 (서명으로 검증, CSRF 예외는 SecurityConfig에서 따로 등록)
-        add(HttpMethod.POST, "/api/webhooks/portone/support");
+        // PortOne 결제 웹훅 (서명으로 검증, CSRF 예외는 SecurityConfig에서 따로 등록)
+        add(HttpMethod.POST, "/api/webhooks/portone");
     }
 
     public static final RequestMatcher MATCHER = new OrRequestMatcher(MATCHERS);

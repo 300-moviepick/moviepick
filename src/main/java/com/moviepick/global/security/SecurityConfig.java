@@ -1,4 +1,3 @@
-
 package com.moviepick.global.security;
 
 import com.moviepick.global.config.FrontendProperties;
@@ -108,7 +107,7 @@ public class SecurityConfig {
                 )
 
                 // CSRF는 쿠키 토큰 방식(XSRF-TOKEN 쿠키 + X-XSRF-TOKEN 헤더)
-                // 서버 간 호출인 PortOne 후원 웹훅만 제외 (서명으로 검증). 공개 주소 목록(PublicEndpoints)과는 별개다
+                // 서버 간 호출인 PortOne 결제 웹훅만 제외 (서명으로 검증). 공개 주소 목록(PublicEndpoints)과는 별개다
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(
                                 CookieCsrfTokenRepository.withHttpOnlyFalse()
@@ -118,7 +117,7 @@ public class SecurityConfig {
                         )
                         .ignoringRequestMatchers(
                                 PathPatternRequestMatcher.withDefaults()
-                                        .matcher(HttpMethod.POST, "/api/webhooks/portone/support")
+                                        .matcher(HttpMethod.POST, "/api/webhooks/portone")
                         )
                         // JWT 인증 요청마다 CSRF 토큰을 교체하지 않음
                         .sessionAuthenticationStrategy(
@@ -171,10 +170,6 @@ public class SecurityConfig {
         );
 
         configuration.setAllowCredentials(true);
-
-        configuration.setExposedHeaders(
-                List.of("Authorization")
-        );
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();

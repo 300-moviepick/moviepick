@@ -30,15 +30,18 @@ class ArchitectureTest {
                     .should().beFreeOfCycles();
 
     // PortOne 웹훅 공통 컴포넌트는 결제 유형과 무관해야 한다 (후원 전용 코드에 의존하지 않음)
+    // 결제 공통 코드를 payment로 옮기면서 패키지 이름을 맞췄다. 후원(support)·AI 크레딧(ai) 코드도 같은 이유로 막는다
     @ArchTest
     static final ArchRule portone_웹훅_공통_컴포넌트는_후원_전용_코드에_의존하지_않는다 =
-            noClasses().that().resideInAPackage("com.moviepick.domain.support.client.webhook..")
+            noClasses().that().resideInAPackage("com.moviepick.domain.payment.client.webhook..")
                     .should().dependOnClassesThat().resideInAnyPackage(
-                            "com.moviepick.domain.support.service..",
-                            "com.moviepick.domain.support.entity..",
-                            "com.moviepick.domain.support.repository..",
-                            "com.moviepick.domain.support.controller..",
-                            "com.moviepick.domain.support.exception..");
+                            "com.moviepick.domain.payment.service..",
+                            "com.moviepick.domain.payment.entity..",
+                            "com.moviepick.domain.payment.repository..",
+                            "com.moviepick.domain.payment.controller..",
+                            "com.moviepick.domain.payment.exception..",
+                            "com.moviepick.domain.support..",
+                            "com.moviepick.domain.ai..");
 
     @ArchTest
     static final ArchRule admin은_repository와_entity를_직접_쓰지_않는다 =

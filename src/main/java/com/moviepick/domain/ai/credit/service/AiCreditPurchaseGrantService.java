@@ -1,13 +1,13 @@
 package com.moviepick.domain.ai.credit.service;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.entity.AiCreditTransaction;
 import com.moviepick.domain.ai.credit.entity.AiCreditWallet;
 import com.moviepick.domain.ai.credit.repository.AiCreditTransactionRepository;
 import com.moviepick.domain.ai.credit.repository.AiCreditWalletRepository;
-import com.moviepick.domain.support.entity.Payment;
-import com.moviepick.domain.support.repository.PaymentRepository;
+import com.moviepick.domain.payment.entity.Payment;
+import com.moviepick.domain.payment.repository.PaymentRepository;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,14 +44,14 @@ public class AiCreditPurchaseGrantService {
         AiCreditWallet wallet = walletRepository
                 .findByMemberIdForUpdate(memberId)
                 .orElseThrow(() -> new BusinessException(
-                        CommonErrorCode.AI_WALLET_NOT_FOUND
+                        AiErrorCode.AI_WALLET_NOT_FOUND
                 ));
         wallet.grantPaidCredits(credits);
 
         // ③ PURCHASE 원장 (결제 건 연결, 멱등 키)
         Payment payment = paymentRepository.findByPaymentId(paymentId)
                 .orElseThrow(() -> new BusinessException(
-                        CommonErrorCode.AI_CREDIT_PURCHASE_NOT_FOUND
+                        AiErrorCode.AI_CREDIT_PURCHASE_NOT_FOUND
                 ));
 
         transactionRepository.saveAndFlush(
