@@ -1,17 +1,16 @@
 package com.moviepick.domain.ai.credit.service;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.entity.AiCreditBucket;
 import com.moviepick.domain.ai.credit.entity.AiCreditTransaction;
 import com.moviepick.domain.ai.credit.entity.AiCreditWallet;
 import com.moviepick.domain.ai.credit.repository.AiCreditTransactionRepository;
 import com.moviepick.domain.ai.credit.repository.AiCreditWalletRepository;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,17 +23,17 @@ public class AiCreditSpendService {
     @Transactional
     public SpendResult spendOne(Long memberId, String requestKey) {
 
-        String normalizedKey = normalizeRequestKey(requestKey);
+        String normalizedKey = AiCreditRequestKeys.normalize(requestKey);
 
         // ① 지갑 쓰기 잠금 획득
         AiCreditWallet wallet = walletRepository
                 .findByMemberIdForUpdate(memberId)
                 .orElseThrow(() -> new BusinessException(
-                        CommonErrorCode.AI_WALLET_NOT_FOUND
+                        AiErrorCode.AI_WALLET_NOT_FOUND
                 ));
 
         String idempotencyKey =
-                "USE:MEMBER:" + memberId + ":REQ:" + normalizedKey;
+                AiCreditRequestKeys.useKey(memberId, normalizedKey);
 
         // ② 동일한 요청으로 이미 사용했다면 재차감하지 않는다.
         var existing = transactionRepository
@@ -42,17 +41,17 @@ public class AiCreditSpendService {
 
         if (existing.isPresent()) {
 
-            // [추가] 이미 종료된 요청 키는 다시 사용하지 않는다.
+            // 이미 종료된 요청 키는 다시 사용하지 않는다.
             String completeKey =
-                    "COMPLETE:MEMBER:" + memberId + ":REQ:" + normalizedKey;
+                    AiCreditRequestKeys.completeKey(memberId, normalizedKey);
 
             String restoreKey =
-                    "RESTORE:MEMBER:" + memberId + ":REQ:" + normalizedKey;
+                    AiCreditRequestKeys.restoreKey(memberId, normalizedKey);
 
             if (transactionRepository.existsByIdempotencyKey(completeKey)
                     || transactionRepository.existsByIdempotencyKey(restoreKey)) {
                 throw new BusinessException(
-                        CommonErrorCode.AI_CREDIT_REQUEST_ALREADY_FINALIZED
+                        AiErrorCode.AI_CREDIT_REQUEST_ALREADY_FINALIZED
                 );
             }
 
@@ -83,26 +82,6 @@ public class AiCreditSpendService {
                 wallet.getPaidAvailable(),
                 false
         );
-    }
-
-    private String normalizeRequestKey(String requestKey) {
-
-        if (requestKey == null) {
-            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
-        }
-
-        try {
-            UUID uuid = UUID.fromString(requestKey);
-
-            if (!uuid.toString().equalsIgnoreCase(requestKey)) {
-                throw new IllegalArgumentException("잘못된 UUID 형식");
-            }
-
-            return uuid.toString();
-
-        } catch (IllegalArgumentException e) {
-            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
-        }
     }
 
     // 현재는 내부 서비스 반환값으로 사용

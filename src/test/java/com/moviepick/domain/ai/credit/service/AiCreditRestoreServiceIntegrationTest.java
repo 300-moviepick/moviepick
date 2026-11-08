@@ -1,5 +1,6 @@
 package com.moviepick.domain.ai.credit.service;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.entity.AiCreditBucket;
 import com.moviepick.domain.ai.credit.entity.AiCreditEventType;
 import com.moviepick.domain.ai.credit.entity.AiCreditTransaction;
@@ -158,7 +159,7 @@ class AiCreditRestoreServiceIntegrationTest {
         ).isInstanceOfSatisfying(
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode())
-                        .isEqualTo(CommonErrorCode.AI_CREDIT_USE_NOT_FOUND)
+                        .isEqualTo(AiErrorCode.AI_CREDIT_USE_NOT_FOUND)
         );
 
         assertThat(walletRepository

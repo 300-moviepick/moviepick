@@ -1,8 +1,8 @@
 package com.moviepick.domain.ai.credit.entity;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -96,11 +96,11 @@ public class AiCreditWallet {
         }
 
         throw new BusinessException(
-                CommonErrorCode.AI_CREDIT_INSUFFICIENT
+                AiErrorCode.AI_CREDIT_INSUFFICIENT
         );
     }
 
-    // [추가] 사용한 크레딧 종류에 맞춰 1회 복구
+    // 사용한 크레딧 종류에 맞춰 1회 복구
     public void restoreOneCredit(AiCreditBucket bucket) {
 
         if (bucket == null) {

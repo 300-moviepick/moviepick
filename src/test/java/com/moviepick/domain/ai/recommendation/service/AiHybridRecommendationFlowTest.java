@@ -1,5 +1,6 @@
 package com.moviepick.domain.ai.recommendation.service;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.entity.AiCreditBucket;
 import com.moviepick.domain.ai.credit.service.AiCreditCompleteService;
 import com.moviepick.domain.ai.credit.service.AiCreditRestoreService;
@@ -10,7 +11,6 @@ import com.moviepick.domain.ai.recommendation.dto.AiMovieReason;
 import com.moviepick.domain.ai.recommendation.dto.AiRecommendRequest;
 import com.moviepick.domain.ai.recommendation.dto.AiRecommendedMovie;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -169,12 +169,12 @@ class AiHybridRecommendationFlowTest {
         given(semanticServiceProvider.getIfAvailable())
                 .willReturn(semanticService);
 
-        // Ollama 또는 의미 검색 장애 상황
+        // 임베딩 API 또는 의미 검색 장애 상황
         given(semanticService.scoreMovies(
                 PROMPT,
                 candidates
         )).willThrow(
-                new IllegalStateException("Ollama 연결 실패")
+                new IllegalStateException("임베딩 API 연결 실패")
         );
 
         givenSuccessfulSpend();
@@ -314,7 +314,7 @@ class AiHybridRecommendationFlowTest {
         ).isInstanceOfSatisfying(
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode()).isEqualTo(
-                        CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
+                        AiErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
                 )
         );
 

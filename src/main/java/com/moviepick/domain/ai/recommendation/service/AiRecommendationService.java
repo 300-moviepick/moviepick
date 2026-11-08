@@ -1,5 +1,6 @@
 package com.moviepick.domain.ai.recommendation.service;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.service.AiCreditCompleteService;
 import com.moviepick.domain.ai.credit.service.AiCreditRestoreService;
 import com.moviepick.domain.ai.credit.service.AiCreditSpendService;
@@ -10,7 +11,6 @@ import com.moviepick.domain.ai.recommendation.dto.AiRecommendRequest;
 import com.moviepick.domain.ai.recommendation.dto.AiRecommendResponse;
 import com.moviepick.domain.ai.recommendation.dto.AiRecommendedMovie;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -56,7 +56,7 @@ public class AiRecommendationService {
 
         if (candidatePool == null || candidatePool.isEmpty()) {
             throw new BusinessException(
-                    CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
+                    AiErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
             );
         }
 
@@ -74,7 +74,7 @@ public class AiRecommendationService {
 
         if (availableCandidates.isEmpty()) {
             throw new BusinessException(
-                    CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
+                    AiErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
             );
         }
 
@@ -105,7 +105,7 @@ public class AiRecommendationService {
         // ⑧ 동일 요청 중복 처리
         if (spendResult.duplicate()) {
             throw new BusinessException(
-                    CommonErrorCode.AI_RECOMMENDATION_IN_PROGRESS
+                    AiErrorCode.AI_RECOMMENDATION_IN_PROGRESS
             );
         }
 
@@ -132,7 +132,7 @@ public class AiRecommendationService {
 
             if (rankedCandidates == null || rankedCandidates.isEmpty()) {
                 throw new BusinessException(
-                        CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
+                        AiErrorCode.AI_RECOMMENDATION_NO_CANDIDATES
                 );
             }
 
@@ -170,7 +170,7 @@ public class AiRecommendationService {
 
         } catch (RuntimeException aiFailure) {
 
-            // [추가] 원본 예외와 스택 트레이스 출력
+            // 원본 예외와 스택 트레이스 출력
             log.error(
                     "AI 추천 처리 실패. memberId={}, requestKey={}",
                     memberId,
@@ -206,12 +206,12 @@ public class AiRecommendationService {
             // 후보 없음은 차감 전과 같은 오류 코드로 응답한다
             if (aiFailure instanceof BusinessException businessException
                     && businessException.getErrorCode()
-                    == CommonErrorCode.AI_RECOMMENDATION_NO_CANDIDATES) {
+                    == AiErrorCode.AI_RECOMMENDATION_NO_CANDIDATES) {
                 throw businessException;
             }
 
             throw new BusinessException(
-                    CommonErrorCode.AI_RECOMMENDATION_FAILED
+                    AiErrorCode.AI_RECOMMENDATION_FAILED
             );
         }
 

@@ -1,5 +1,6 @@
 package com.moviepick.domain.ai.credit.service;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.entity.AiCreditEventType;
 import com.moviepick.domain.ai.credit.entity.AiCreditTransaction;
 import com.moviepick.domain.ai.credit.entity.AiCreditWallet;
@@ -9,7 +10,6 @@ import com.moviepick.domain.member.entity.Member;
 import com.moviepick.domain.member.repository.MemberRepository;
 import com.moviepick.global.config.JpaAuditingConfig;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -156,7 +156,7 @@ class AiCreditCompleteServiceIntegrationTest {
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode())
                         .isEqualTo(
-                                CommonErrorCode.AI_CREDIT_REQUEST_ALREADY_FINALIZED
+                                AiErrorCode.AI_CREDIT_REQUEST_ALREADY_FINALIZED
                         )
         );
 
@@ -179,7 +179,7 @@ class AiCreditCompleteServiceIntegrationTest {
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode())
                         .isEqualTo(
-                                CommonErrorCode.AI_CREDIT_REQUEST_ALREADY_FINALIZED
+                                AiErrorCode.AI_CREDIT_REQUEST_ALREADY_FINALIZED
                         )
         );
 
@@ -201,7 +201,7 @@ class AiCreditCompleteServiceIntegrationTest {
         ).isInstanceOfSatisfying(
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode())
-                        .isEqualTo(CommonErrorCode.AI_CREDIT_USE_NOT_FOUND)
+                        .isEqualTo(AiErrorCode.AI_CREDIT_USE_NOT_FOUND)
         );
 
         assertThat(transactionRepository.count()).isEqualTo(2);
@@ -245,7 +245,7 @@ class AiCreditCompleteServiceIntegrationTest {
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode())
                         .isEqualTo(
-                                CommonErrorCode.AI_CREDIT_REQUEST_ALREADY_FINALIZED
+                                AiErrorCode.AI_CREDIT_REQUEST_ALREADY_FINALIZED
                         )
         );
 
@@ -263,7 +263,7 @@ class AiCreditCompleteServiceIntegrationTest {
                 BusinessException.class,
                 e -> assertThat(e.getErrorCode())
                         .isEqualTo(
-                                CommonErrorCode.AI_CREDIT_REQUEST_ALREADY_FINALIZED
+                                AiErrorCode.AI_CREDIT_REQUEST_ALREADY_FINALIZED
                         )
         );
 

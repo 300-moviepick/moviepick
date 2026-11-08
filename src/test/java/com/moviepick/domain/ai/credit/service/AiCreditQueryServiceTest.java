@@ -1,5 +1,6 @@
 package com.moviepick.domain.ai.credit.service;
 
+import com.moviepick.domain.ai.exception.AiErrorCode;
 import com.moviepick.domain.ai.credit.dto.response.AiCreditBalanceResponse;
 import com.moviepick.domain.ai.credit.dto.response.AiCreditTransactionResponse;
 import com.moviepick.domain.ai.credit.entity.AiCreditBucket;
@@ -10,7 +11,6 @@ import com.moviepick.domain.ai.credit.repository.AiCreditTransactionRepository;
 import com.moviepick.domain.ai.credit.repository.AiCreditWalletRepository;
 import com.moviepick.domain.member.entity.Member;
 import com.moviepick.global.exception.BusinessException;
-import com.moviepick.global.exception.CommonErrorCode;
 import com.moviepick.global.response.PageResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,7 +35,7 @@ class AiCreditQueryServiceTest {
     @Mock
     private AiCreditWalletRepository walletRepository;
 
-    // [추가] 거래 내역 Repository Mock
+    // 거래 내역 Repository Mock
     @Mock
     private AiCreditTransactionRepository transactionRepository;
 
@@ -97,13 +97,13 @@ class AiCreditQueryServiceTest {
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
-                                .isEqualTo(CommonErrorCode.AI_WALLET_NOT_FOUND)
+                                .isEqualTo(AiErrorCode.AI_WALLET_NOT_FOUND)
                 );
 
         verify(walletRepository, never()).save(any());
     }
 
-    // [추가] 거래 내역 조회 및 정렬 검증
+    // 거래 내역 조회 및 정렬 검증
     @Test
     void 거래_내역을_최신순으로_조회한다() {
 
@@ -156,7 +156,7 @@ class AiCreditQueryServiceTest {
                 .getOrderFor("id").isDescending()).isTrue();
     }
 
-    // [추가] 거래가 없으면 빈 목록 반환
+    // 거래가 없으면 빈 목록 반환
     @Test
     void 거래_내역이_없으면_빈_페이지를_반환한다() {
 
@@ -179,7 +179,7 @@ class AiCreditQueryServiceTest {
         assertThat(response.totalElements()).isZero();
     }
 
-    // [추가] 본인 지갑이 없으면 조회 불가
+    // 본인 지갑이 없으면 조회 불가
     @Test
     void 지갑이_없으면_거래_내역도_조회할_수_없다() {
 
