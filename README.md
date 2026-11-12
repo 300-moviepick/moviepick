@@ -57,7 +57,8 @@ MySQL 데이터 볼륨이 비어 있을 때(처음 만들 때) `db/init/00-init.
 
 | 구분 | 변수 | 기본값 | 설명 |
 |---|---|---|---|
-| 필수 | `JWT_SECRET`, `TMDB_ACCESS_TOKEN` | 없음 | 비어 있으면 앱이 시작되지 않는다 |
+| 필수 | `JWT_SECRET` | 없음 | 비어 있거나 형식(Base64, 디코딩 후 32바이트 이상)이 틀리면 앱이 시작되지 않는다 |
+| 필수 | `TMDB_ACCESS_TOKEN` | 없음 | 변수 줄 자체가 없으면 앱이 시작되지 않는다. 빈 값이면 시작은 되지만 영화 수집·상세 확장 정보 조회 때 실패한다 |
 | DB·Redis | `MYSQL_*`, `REDIS_PORT` | 3307 / 6380 등 | Docker와 앱이 같이 읽는다 |
 | 결제 | `PORTONE_API_SECRET`, `PORTONE_STORE_ID`, `PORTONE_CHANNEL_KEY`, `PORTONE_WEBHOOK_SECRET` | 빈 값 | 비어 있어도 시작되지만 결제 확인·웹훅이 실패한다. PortOne 콘솔의 웹훅 주소는 `{서버 주소}/api/webhooks/portone`(후원·AI 크레딧 공통) |
 | 소셜 로그인 | `KAKAO_*`, `GOOGLE_*` | 더미 값 | 카카오·구글 로그인을 쓸 때 채운다 |
@@ -67,6 +68,7 @@ MySQL 데이터 볼륨이 비어 있을 때(처음 만들 때) `db/init/00-init.
 | 프론트 | `APP_FRONTEND_URL`, `APP_FRONTEND_ALLOWED_ORIGINS` | `http://localhost:5173` | 소셜 로그인 후 이동 주소, CORS 허용 주소 |
 | 쿠키 | `APP_COOKIE_SECURE` | `false` | HTTPS 운영에서는 `true` |
 | 배치 | `MOVIE_BATCH_*` | 아래 [정기 수집](#정기-수집) 참고 | |
+| 개봉 알림 | 설정 `notification.scheduler.enabled` (`.env.example`에 없음) | 켜짐 | 매일 09:00(한국 시간)에 찜한 영화의 개봉 알림을 만든다. 끌 때는 실행 인자 `--notification.scheduler.enabled=false`를 준다(`.run/MoviePick-perf.run.xml` 참고) |
 
 ## IntelliJ 실행 설정
 `Run/Debug Configurations` → `MoviePickApplication`
@@ -74,7 +76,7 @@ MySQL 데이터 볼륨이 비어 있을 때(처음 만들 때) `db/init/00-init.
 | 항목 | 값 | 이유 |
 |---|---|---|
 | Active profiles | `local` | 로컬 설정과 초기 수집 기능이 `local` 프로필 전용이다 |
-| Working directory | `moviepick` 폴더(프로젝트 맨 위) | `.env`를 이 폴더 기준 상대 경로로 읽는다. 다른 폴더면 DB 설정을 읽지 못한다 |
+| Working directory | 저장소 맨 위 폴더(클론한 폴더, `.env`가 있는 곳) | `.env`를 이 폴더 기준 상대 경로로 읽는다. 다른 폴더면 DB 설정을 읽지 못한다 |
 | Shorten command line | `JAR manifest` | `Command line is too long` 오류를 막는다 |
 | Environment variables | 비워 둔다 | 실행 설정의 환경 변수가 `.env`보다 우선한다. 같은 이름이 있으면 `.env`를 고쳐도 반영되지 않는다 |
 
@@ -156,7 +158,7 @@ TMDB 인기 영화를 수집해 `movies`, `movie_genres`에 저장한다. 팀원
 |---|---|---|
 | `Communications link failure` | MySQL 초기화가 끝나기 전에 앱을 실행했다 | `docker compose logs -f mysql`에서 마지막 `ready for connections ... port: 3306`을 확인한 뒤 다시 실행한다 |
 | `Command line is too long` | IntelliJ 실행 명령이 Windows 길이 제한을 넘었다 | 실행 설정의 Shorten command line을 `JAR manifest`로 바꾼다 |
-| `Unable to determine Dialect` | `.env`를 읽지 못해 DB 설정이 비었다 | 실행 설정의 Working directory가 `moviepick` 폴더인지 확인한다 |
+| `Unable to determine Dialect` | `.env`를 읽지 못해 DB 설정이 비었다 | 실행 설정의 Working directory가 저장소 맨 위 폴더인지 확인한다 |
 | `Schema-validation: missing table ...` 등 스키마 검증 오류 | 오래된 DB 볼륨이라 새 테이블·컬럼이 없다 | `docker compose down -v` → `docker compose up -d`로 DB를 새로 만든다(로컬 데이터가 지워진다) |
 | 초기 수집 후 앱 시작 실패 | 수집 중 1편 이상 실패했다 | 위 [실패했을 때](#실패했을-때)를 참고한다 |
 | 원인을 알 수 없는 오류 | 코드 문제인지 IntelliJ 설정 문제인지 모른다 | 먼저 `./gradlew bootRun`으로 실행해 본다. 이렇게 하면 정상이면 IntelliJ 실행 설정을 확인한다 |
@@ -173,28 +175,41 @@ TMDB 인기 영화를 수집해 `movies`, `movie_genres`에 저장한다. 팀원
   - dev를 받은 뒤 스키마 검증 오류가 나면 위 [문제 해결](#문제-해결)처럼 DB를 새로 만든다.
 - 응답은 `ApiResponse`를, 예외는 `BusinessException`과 도메인별 `ErrorCode`를 사용한다.
 - 테스트는 H2로 실행된다(`src/test/resources/config/application.yml`).
+  - 예외: 신고 처리 동시성 테스트 4개(`AdminReportConcurrencyTest`)는 실제 MySQL이 필요해 환경변수 `TEST_DB_PASSWORD`가 있을 때만 실행되고, 없으면 건너뛴다(접속 설정 `src/test/resources/config/application-concurrency.yml`).
 
-## 배포 (운영, 초안)
-> ⑤-2에서 실제 진행 순서에 맞춰 다시 고친다. 명령은 EC2(Ubuntu)의 터미널에서 실행한다(PC에서 실행하는 명령은 따로 표시).
+## 배포 (운영)
+명령은 따로 표시하지 않으면 EC2(Ubuntu)의 터미널에서 실행한다. PC에서 실행하는 명령은 `# PC` 주석으로 표시한다.
+서버 IP와 키 파일 이름은 문서에 적지 않고 `<서버 IP>`, `<키 파일>`로 쓴다.
 
 ### 구성
 | 항목 | 내용 |
 |---|---|
-| 주소 | 프론트 `https://www.moviepick.kr`(Vercel, 루트 `moviepick.kr`은 www로 이동), 백엔드 `https://api.moviepick.kr` |
-| 서버 | AWS EC2 1대(서울, Ubuntu, 메모리 4GB). Docker로 앱·MySQL·Redis·Caddy를 함께 실행 |
-| 파일 | `docker-compose.prod.yml`(운영 compose), `Dockerfile`(앱 이미지), `Caddyfile`(HTTPS·리버스 프록시), `.env.prod.example`(운영 `.env` 예시), `src/main/resources/application-prod.yml`(prod 프로필) |
-| 요청 경로 | 브라우저 → Vercel(`/api`, `/oauth2/authorization`, `/login/oauth2` 중계) → Caddy(443) → 앱(8080). PortOne 웹훅은 Caddy로 바로 들어온다 |
-| 브랜치 | EC2는 `main`을 받는다. 배포 전에 `dev` → `main` 머지 |
+| 주소 | 서비스 `https://www.moviepick.kr`(루트 `moviepick.kr`은 www로 영구 이동), `https://api.moviepick.kr`(PortOne 웹훅 수신용). 세 주소 모두 같은 EC2 |
+| 서버 | AWS EC2 1대(서울, Ubuntu 24.04, t4g.medium). Docker Compose로 app·mysql·redis·caddy를 함께 실행 |
+| 파일 | `docker-compose.prod.yml`(운영 compose), `Dockerfile`(앱 이미지), `Caddyfile`(HTTPS·프론트 화면 제공·리버스 프록시), `.env.prod.example`(운영 `.env` 예시), `src/main/resources/application-prod.yml`(prod 프로필) |
+| 프론트 | 프론트 저장소(`moviepick-front`)에서 빌드한 결과를 서버의 `~/moviepick/front/`에 올린다. Caddy가 `/srv/front`로 읽어 제공한다 |
+| 코드 전달 | 서버는 git에서 코드를 받지 않는다. PC에서 만든 압축 파일을 올린다(아래 3단계, 10단계) |
+| 브랜치 | 기능 브랜치 → `dev`(개발 통합) → `main`(배포 기준). EC2에는 `main`으로 만든 압축을 올린다 |
+
+```
+브라우저 ──https──▶ Caddy (EC2 443)
+                     ├─ www.moviepick.kr
+                     │    ├─ /api/*, /oauth2/authorization/*, /login/oauth2/* ──▶ Spring Boot (app:8080)
+                     │    └─ 그 외 경로 ──▶ 프론트 정적 파일 (/srv/front, 없는 경로는 index.html)
+                     ├─ moviepick.kr ──▶ https://www.moviepick.kr 로 영구 이동
+                     └─ api.moviepick.kr ──▶ Spring Boot (PortOne 웹훅)
+Spring Boot ──▶ MySQL (mysql:3306), Redis (redis:6379)   ※ 컨테이너 내부망, 외부 포트 없음
+```
 
 ### 1. EC2 준비
-1. EC2 인스턴스를 만든다(서울 리전, Ubuntu, 메모리 4GB). 키 페어 `.pem`은 공유하거나 커밋하지 않는다.
+1. EC2 인스턴스를 만든다(서울 리전, Ubuntu 24.04, t4g.medium). 키 페어 파일은 공유하거나 커밋하지 않는다.
 2. 고정 IP(탄력적 IP)를 연결한다.
 3. 보안 그룹 인바운드 규칙
    - TCP 80·443: 전체(0.0.0.0/0) — 인증서 발급과 HTTPS
    - TCP 22: **내 IP만**
    - UDP 443: 선택(HTTP/3). 열지 않아도 정상 동작한다
    - **3306(MySQL)·6379(Redis)·8080(앱)은 열지 않는다**
-4. DNS에 `api` A 레코드 → 고정 IP. **Caddy를 띄우기 전에** 연결되어 있어야 인증서가 발급된다(`nslookup api.moviepick.kr`로 확인).
+4. DNS에 `www`, 루트(`moviepick.kr`), `api` A 레코드를 모두 고정 IP로 연결한다. **Caddy를 띄우기 전에** 연결되어 있어야 인증서가 발급된다(`nslookup www.moviepick.kr` 등으로 확인).
 5. 스왑 2GB를 만든다(서버에서 이미지를 빌드할 때 메모리 여유).
    ```bash
    sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
@@ -215,19 +230,35 @@ sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli container
 sudo usermod -aG docker $USER
 ```
 - 마지막 명령 후 접속을 끊었다가 다시 접속한다. `docker compose version`으로 확인한다.
+- 압축 해제 후 줄바꿈 변환에 쓸 `dos2unix`도 설치한다.
+  ```bash
+  sudo apt-get install -y dos2unix
+  ```
 
-### 3. 저장소 받기
+### 3. 백엔드 코드 올리기
+PC에서 `main` 브랜치를 압축해 서버로 보낸다. `.env`, `front/`, `db/seed/`의 덤프는 저장소에 없으므로 압축에 들어가지 않는다.
 ```bash
-git clone -b main https://github.com/spa-300/moviepick.git ~/moviepick
+# PC의 Git Bash, 백엔드 저장소 맨 위 폴더에서 실행
+git archive --format=tar.gz -o ~/moviepick-deploy.tar.gz main
+scp -i ~/.ssh/<키 파일> ~/moviepick-deploy.tar.gz ubuntu@<서버 IP>:~/
 ```
+```bash
+mkdir -p ~/moviepick && tar -xzf ~/moviepick-deploy.tar.gz -C ~/moviepick
+cd ~/moviepick && find . -path ./front -prune -o -path ./db/seed -prune -o -type f -exec dos2unix -q {} +
+```
+- Windows에서 만든 압축은 줄바꿈이 CRLF일 수 있어 `dos2unix`로 LF로 바꾼다(스크립트·설정 파일이 CRLF면 서버에서 오동작할 수 있다). `front/`와 `db/seed/`는 건드리지 않는다.
+- 압축을 풀면 파일이 덮어써지기만 한다. 저장소에서 지운 파일은 서버에 남으므로 필요하면 직접 지운다.
 
 ### 4. 영화 덤프 옮기기
 `db/seed/`의 덤프는 Git에 없으므로 PC에서 직접 보낸다. **처음 compose를 실행하기 전에** 넣어야 적재된다.
 ```bash
-# PC의 Git Bash, 백엔드 폴더에서 실행
-scp -i <키 파일 경로>.pem db/seed/movies_batch_20261106.sql ubuntu@<고정 IP>:~/moviepick/db/seed/
+# PC의 Git Bash, 백엔드 저장소 맨 위 폴더에서 실행
+scp -i ~/.ssh/<키 파일> db/seed/movies_batch_20261106.sql ubuntu@<서버 IP>:~/moviepick/db/seed/
 ```
 - `db/seed/`에는 덤프 하나만 둔다. 처음 실행 때 `db/init/00-init.sh`가 스키마(`movie_embeddings`, `AI_CREDIT`이 포함된 `payments.product_type` 포함) → 관리자 계정 → 덤프 순서로 적재한다.
+
+### 4-1. 프론트 화면 올리기
+프론트 저장소에서 빌드한 결과를 `~/moviepick/front/`에 푼다. 절차는 아래 [10. 배포 후 수정](#10-배포-후-수정)의 프론트 절차와 같다. 이 폴더가 비어 있으면 `www.moviepick.kr`에 화면이 나오지 않는다.
 
 ### 5. 운영 `.env` 작성
 ```bash
@@ -251,12 +282,12 @@ docker compose -f docker-compose.prod.yml logs -f mysql
 docker compose -f docker-compose.prod.yml logs caddy | grep -i "certificate obtained"
 ```
 ```bash
-curl -s "https://api.moviepick.kr/api/movies?page=0&size=1" | head -c 200
+curl -s "https://www.moviepick.kr/api/movies?page=0&size=1" | head -c 200
 ```
-- `"success":true`로 시작하는 응답이 오면 HTTPS·앱·DB가 모두 정상이다.
+- `"success":true`로 시작하는 응답이 오면 HTTPS·Caddy 중계·앱·DB가 모두 정상이다. 브라우저로 `https://www.moviepick.kr`을 열어 화면도 확인한다.
 
 ### 8. 관리자 비밀번호 변경
-시드 관리자 계정(`db/data.sql`)은 공개된 비밀번호를 쓰므로 운영에서는 바로 바꾼다. 비밀번호 변경 API가 없어 DB에서 직접 바꾼다. **비밀번호와 해시는 어디에도 적지 않는다.**
+시드 관리자 계정(`db/data.sql`)의 비밀번호는 저장소에 두지 않고 팀에 따로 전달한다. 운영에서는 배포 직후 반드시 다른 비밀번호로 바꾼다. 비밀번호 변경 API가 없어 DB에서 직접 바꾼다. **비밀번호와 해시는 어디에도 적지 않는다.**
 1. bcrypt 해시를 만든다(비밀번호는 입력 프롬프트에 친다. 명령에 쓰면 기록에 남는다).
    ```bash
    sudo apt-get install -y apache2-utils && htpasswd -nBC 10 ""
@@ -280,11 +311,34 @@ AI 추천은 영화 임베딩이 있어야 동작한다. 영화 2,000편 기준 
 3. **바로 그 줄을 지우고** 앱을 다시 띄운다(`up -d app`). 실패가 있으면 앱이 시작 실패 → 자동 재시작을 반복하며 다시 수집하므로, 실패해도 줄을 먼저 지우고 원인을 확인한다.
 
 ### 10. 배포 후 수정
-- 백엔드: `dev` → `main` 머지 후 EC2에서
-  ```bash
-  cd ~/moviepick && git pull && docker compose -f docker-compose.prod.yml up -d --build app
-  ```
-  - 앱 컨테이너만 다시 빌드한다. MySQL·Redis·Caddy는 그대로 둔다.
+`.env`, `front/`, `db/seed/`는 압축에 없으므로 서버에 그대로 유지된다.
+
+**프론트를 고쳤을 때** (프론트 저장소, PC PowerShell → 서버). Caddy는 다시 시작하지 않아도 된다.
+```powershell
+# PC PowerShell, 프론트 저장소 맨 위 폴더에서 실행
+npm run build
+tar -czf "$HOME\front-dist.tar.gz" -C dist .
+scp -i "$HOME\.ssh\<키 파일>" "$HOME\front-dist.tar.gz" ubuntu@<서버 IP>:~/
+```
+```bash
+cd ~/moviepick && rm -rf front && mkdir front && tar -xzf ~/front-dist.tar.gz -C front
+```
+
+**백엔드를 고쳤을 때** (`dev` → `main` 머지 후, PC Git Bash → 서버)
+```bash
+# PC의 Git Bash, 백엔드 저장소 맨 위 폴더에서 main을 최신으로 받은 뒤 실행
+git archive --format=tar.gz -o ~/moviepick-deploy.tar.gz main
+scp -i ~/.ssh/<키 파일> ~/moviepick-deploy.tar.gz ubuntu@<서버 IP>:~/
+```
+```bash
+cd ~/moviepick && tar -xzf ~/moviepick-deploy.tar.gz -C ~/moviepick
+find . -path ./front -prune -o -path ./db/seed -prune -o -type f -exec dos2unix -q {} +
+docker compose -f docker-compose.prod.yml up -d --build app
+```
+- 앱 컨테이너만 다시 빌드한다. MySQL·Redis·Caddy는 그대로 둔다.
+- `Caddyfile`이나 `docker-compose.prod.yml`을 바꿨으면 caddy에도 반영한다.
+  - compose를 바꿨을 때: `docker compose -f docker-compose.prod.yml up -d`(바뀐 서비스만 다시 만든다)
+  - `Caddyfile`만 바꿨을 때: `docker compose -f docker-compose.prod.yml restart caddy`(파일 하나를 연결한 볼륨이라 압축을 풀어 새 파일이 생기면 다시 시작해야 읽는다)
 - **운영에서 `docker compose ... down -v`는 절대 쓰지 않는다.** DB 데이터와 인증서가 모두 지워진다. 멈출 때는 `down`(`-v` 없이)만 쓴다.
 - DB 구조가 바뀌면 init 스크립트는 다시 실행되지 않으므로, 바뀐 SQL을 운영 DB에 직접 적용한다(위 8-2의 접속 명령).
 - `.env`를 고쳤으면 `docker compose -f docker-compose.prod.yml up -d app`으로 앱을 다시 만든다(AI 스위치도 재시작해야 반영).
@@ -318,8 +372,8 @@ AI 추천은 영화 임베딩이 있어야 동작한다. 영화 2,000편 기준 
 ### 배포 직후 확인
 - [ ] 가입·로그인·새로고침 후 로그인 유지·소셜 로그인(카카오·구글)
 - [ ] 영화 탐색·상세·랭킹·정렬 / 리뷰·커뮤니티·신고
-- [ ] AI 추천·크레딧 차감(응답이 Vercel 대기 한도 안에 오는지)
+- [ ] AI 추천·크레딧 차감
 - [ ] 크레딧 구매·후원 테스트 결제와 웹훅 수신 로그(`logs app | grep 웹훅`)
-- [ ] Vercel 중계: `/api/...`, `/oauth2/authorization/kakao`, `/login/oauth2/code/...`, `/movies/1`에서 새로고침
+- [ ] Caddy 중계·화면: `/api/...`, `/oauth2/authorization/kakao`, `/login/oauth2/code/...`, `/movies/1`에서 새로고침, `https://moviepick.kr` → www 이동
 - [ ] PortOne 모바일 결제 복귀 주소 `/ai/credits`, `/support`가 열리는지
 - [ ] 관리자 비밀번호 변경 완료, 운영 임베딩 생성 완료(`.env`에서 일괄 생성 줄 삭제)
