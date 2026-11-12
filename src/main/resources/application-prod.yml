@@ -19,7 +19,7 @@ spring:
     oauth2:
       client:
         registration:
-          # 소셜 로그인 콜백을 프론트 주소로 고정한다 (Vercel이 백엔드로 중계).
+          # 소셜 로그인 콜백을 프론트 주소(www)로 고정한다. Caddy가 같은 주소에서 /login/oauth2를 백엔드로 중계한다.
           # 그래야 refresh 쿠키가 프론트 도메인에 저장된다. 카카오·구글 콘솔에도 같은 주소를 등록한다
           kakao:
             redirect-uri: "${app.frontend.url}/login/oauth2/code/{registrationId}"
