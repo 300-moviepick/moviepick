@@ -1,7 +1,12 @@
+# 리버스 프록시 + HTTPS 인증서 자동 발급·갱신 (Let's Encrypt). 운영 EC2에서 docker-compose.prod.yml이 띄운다
+
+# API 주소(기본 api.moviepick.kr, docker-compose.prod.yml의 API_DOMAIN): PortOne 웹훅 수신용
 {$API_DOMAIN} {
 	reverse_proxy app:8080
 }
 
+# 서비스 주소: 빌드된 프론트 화면(/srv/front = 서버의 ~/moviepick/front)을 제공하고,
+# API·소셜 로그인 요청만 같은 주소에서 앱으로 중계한다. 나머지 주소는 index.html (새로고침해도 화면 유지)
 www.moviepick.kr {
 	@backend path /api/* /oauth2/authorization/* /login/oauth2/*
 	handle @backend {
@@ -14,6 +19,7 @@ www.moviepick.kr {
 	}
 }
 
+# 루트 주소는 www로 영구 이동 (쿠키·CORS가 www 기준)
 moviepick.kr {
 	redir https://www.moviepick.kr{uri} permanent
 }
