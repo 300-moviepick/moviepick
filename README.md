@@ -235,7 +235,7 @@ docker compose up -d
 
 | 이름 | GitHub | 담당 |
 |---|---|---|
-| 강성현 (팀장) | <a href="https://github.com/Kang-SungHyun"><img src="https://wsrv.nl/?url=github.com/Kang-SungHyun.png&w=100&h=100&fit=cover&mask=circle" width="50px" alt="Kang-SungHyun"/></a> | • 프로젝트 총괄, PortOne 후원·AI 크레딧 결제(confirm + 웹훅 지급 1회)<br>• EC2·Docker Compose·Caddy 운영 배포<br>• 프론트엔드 화면 구현 |
+| **강성현** (팀장) | <img src="docs/images/team/kang-sunghyun.jpg" width="50" alt="강성현"/> | • 프로젝트 총괄, PortOne 후원·AI 크레딧 결제(confirm + 웹훅 지급 1회)<br>• EC2·Docker Compose·Caddy 운영 배포<br>• 프론트엔드 화면 구현 |
 | 박지민 | <a href="https://github.com/bagj5082-source"><img src="https://wsrv.nl/?url=github.com/bagj5082-source.png&w=100&h=100&fit=cover&mask=circle" width="50px" alt="bagj5082-source"/></a> | • 회원가입·로그인, JWT 인증<br>• 찜, 개봉 알림 스케줄러·알림 센터<br>• 관리자 API, 신고 목록 N+1 제거·인덱스 |
 | 김혁중 | <a href="https://github.com/ihateahri"><img src="https://wsrv.nl/?url=github.com/ihateahri.png&w=100&h=100&fit=cover&mask=circle" width="50px" alt="ihateahri"/></a> | • TMDB 영화 수집(Spring Batch)과 영화 데이터<br>• AI 추천: 임베딩 의미 점수, 리뷰 장르 선호, 추천 이유 생성 |
 | 안우성 | <a href="https://github.com/WsungAn"><img src="https://wsrv.nl/?url=github.com/WsungAn.png&w=100&h=100&fit=cover&mask=circle" width="50px" alt="WsungAn"/></a> | • 리뷰·평점·좋아요, 좋아요순 결과 캐시<br>• 리뷰·댓글 쓰기 데드락 방지, Refresh Token 1회용 교체·재사용 감지<br>• 부하 테스트와 최적화 |
